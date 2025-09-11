@@ -1,0 +1,217 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -304,
+        -128
+      ],
+      "id": "1129966c-8292-4970-9796-489bab8847c6",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "eX4sFQuJC12SifMf",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputText": "={{ $json.text }}",
+        "categories": {
+          "categories": [
+            {
+              "category": "High",
+              "description": "This email is high priority. Keywords: urgent  asap  immediate  important  deadline  action required  complaint  critical  payment due  security"
+            },
+            {
+              "category": "Medium",
+              "description": "This email is medium priority. Keywords: follow up  request  reminder  update  info  review  question  proposal  schedule"
+            },
+            {
+              "category": "Low",
+              "description": "This email low priority. Kwywords: newsletter  promotion  offer  social  event  greetings  subscription  tips  casual"
+            }
+          ]
+        },
+        "options": {
+          "systemPromptTemplate": "Please classify the text provided by the user into one of the following categories: {categories}, and use the provided formatting instructions below. Don't explain, and only output the json."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.textClassifier",
+      "typeVersion": 1.1,
+      "position": [
+        -48,
+        -144
+      ],
+      "id": "e67a3c07-7ba7-4a8b-a4eb-70f8663e9d61",
+      "name": "Text Classifier"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        96
+      ],
+      "id": "05b93719-cb7e-4999-83c9-dfe1108585ae",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "GBrFKoig5R6C66HI",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.id }}",
+        "labelIds": [
+          "Label_1693037613000031523"
+        ]
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        416,
+        -240
+      ],
+      "id": "8eba6e07-cf37-4b15-9af5-f3eda1bb776f",
+      "name": "High Label",
+      "webhookId": "75a5ebf2-760e-4b5e-9706-1df85256d279",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "eX4sFQuJC12SifMf",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.id }}",
+        "labelIds": [
+          "Label_8736107014813410171"
+        ]
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        432,
+        -48
+      ],
+      "id": "9321039e-9cc4-4435-8b64-2634f85fbf15",
+      "name": "Medium Label",
+      "webhookId": "75a5ebf2-760e-4b5e-9706-1df85256d279",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "eX4sFQuJC12SifMf",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.id }}",
+        "labelIds": [
+          "Label_5276446877841857227"
+        ]
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        432,
+        144
+      ],
+      "id": "a007d269-3835-45fc-b2cd-af34bc788e3e",
+      "name": "Low Label",
+      "webhookId": "75a5ebf2-760e-4b5e-9706-1df85256d279",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "eX4sFQuJC12SifMf",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Text Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Text Classifier",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text Classifier": {
+      "main": [
+        [
+          {
+            "node": "High Label",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Medium Label",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Low Label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "df44c092-0f59-4b3d-8509-cbd42a4cb055",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4b9822b446f316cc6a1c180c76017b78b9ce23668835d8a3ec2701669d5f2640"
+  },
+  "id": "sHcdaedlcfEx3W4Q",
+  "tags": []
+}
