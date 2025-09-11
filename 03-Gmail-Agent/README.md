@@ -34,6 +34,13 @@ Gmail API – Fetch and manage emails
 
 JavaScript/JSON – Custom rule definitions
 
+# Getting Started
+
+Download The Gmail Agent.json file.
+
+Import the workflow into your n8n instance.
+
+
 ## 🌐 Live Demo
 Check the workflow in action: [Live Demo](https://drive.google.com/file/d/1iEnx7u2yrzS0kyNhnZy2_pa_Pb2F46JW/view)
 
