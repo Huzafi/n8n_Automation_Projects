@@ -22,7 +22,7 @@ Combining Gmail and WhatsApp for seamless communication workflows.
 
 🚀 Getting Started
 
-Clone this repository.
+Download the Whatsapp + Gmail Agent.json file.
 
 Import the workflow into your n8n instance.
 
@@ -36,4 +36,4 @@ Activate the workflow — automation is live!
 Check the workflow in action: [Live Demo](https://drive.google.com/file/d/1i9N0IKWOvfJGRCp-UM3Wu6GXNq2BMIkk/view?usp=sharing)
 
 
-Check the workflow in action: Live Demo
+
