@@ -23,7 +23,7 @@ Maintaining consistent LinkedIn activity without missing a day.
 
 🚀 Getting Started
 
-Clone this repository.
+Copy The Linkedin Agent.json file.
 
 Import the workflow into your n8n instance.
 
