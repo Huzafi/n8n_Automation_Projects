@@ -1,0 +1,302 @@
+{
+  "name": "Linkedin agent",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0980962e-9699-429b-91df-7687c3a9f21c",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Pending",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1280,
+        -320
+      ],
+      "id": "8b2a0fc6-99df-4347-9cce-d2cf760e23c3",
+      "name": "If"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        -1056,
+        -336
+      ],
+      "id": "f2a472cd-c580-4e20-bcfb-6769f0bb902e",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are LinkedIn post writer.You will be given a title and your task is to create an engaging LinkedIn post based on that title.\n\nYour post should:\n1. Begin with a compelling hook related to the title\n2. Include 3-4 paragraphs of informative content\n3. End with a question to encourage engagement\n4. Include 4-6 relevant hashtags\n5. Use appropriate emojos in between\n\nImportant formatting requiremens:\n- Format all paragraphs with ptoper newine characters (\\n\\n) between them\n- Ensure the text is properly escaped for JSON\n- Do not use diuble quote (\"\") in response or any special character\n- Do not put asterisk\n- Keep the overall length appropriate for LinkedIn \n\nNow, creaye a LinkedIn post based on the following title:{{ $json['Linkedin Post Title'] }}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -848,
+        -336
+      ],
+      "id": "9fa0ad4e-84ce-4c2b-948d-a8b838776375",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst updatedItems = items.map((item) => {\n  item.json.output.post = item.json.output.post.replace(\n    /\\n/g,\n    \"\\\\n\",\n  );\n  return item;\n});\nreturn updatedItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        -336
+      ],
+      "id": "15aa628d-e8c0-44d9-b3e2-8f41dd02b268",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "19Lf6clEd0JP4RoUncuOTFaC8HvbvV9GfiodKXsg4jCs",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19Lf6clEd0JP4RoUncuOTFaC8HvbvV9GfiodKXsg4jCs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Post",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19Lf6clEd0JP4RoUncuOTFaC8HvbvV9GfiodKXsg4jCs/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1456,
+        -320
+      ],
+      "id": "2182b72e-6a31-4b4f-96d3-0bce1ff5037b",
+      "name": "Post Data",
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "NqkG9lya4m2DX5ff",
+          "name": "Google Sheets Trigger account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -928,
+        -160
+      ],
+      "id": "998bd076-6af5-43f3-8d97-f54d0d3311d0",
+      "name": "Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Eq7WEYMz2ndYwtSA",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"post\": {\n\t\t\t\"type\": \"string\"\n\t\t}\n}\t\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -656,
+        -160
+      ],
+      "id": "2f1e8cd1-f0d3-4565-b6f6-6089fb871c9b",
+      "name": "Output"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linkedin.com/v2/ugcPosts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"author\": \"urn:li:person:{{ $json.sub }}\",\n  \"lifecycleState\": \"PUBLISHED\",\n  \"specificContent\": {\n    \"com.linkedin.ugc.ShareContent\": {\n      \"shareCommentary\": {\n        \"text\": \"{{ $('Code').item.json.output.post }}\"\n      },\n      \"shareMediaCategory\": \"NONE\"\n    }\n  },\n  \"visibility\": {\n    \"com.linkedin.ugc.MemberNetworkVisibility\": \"PUBLIC\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -32,
+        -336
+      ],
+      "id": "0245bc0f-2188-482b-b8e6-5f0d77b9735b",
+      "name": "Posted",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CssqTlQ9IKvKnWoa",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.linkedin.com/v2/userinfo",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -272,
+        -336
+      ],
+      "id": "6dbc600f-91b1-4d80-9df3-700681d0b056",
+      "name": "LinkedIn Post",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CssqTlQ9IKvKnWoa",
+          "name": "Header Auth account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "LinkedIn Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Data": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn Post": {
+      "main": [
+        [
+          {
+            "node": "Posted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "63511ed8-9125-44f9-9c6a-acb43b86c07e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a77cb8f22e4eb39ad82ec3bf833dc585ba0efbd2ba240638adca0b146b53d5b5"
+  },
+  "id": "rmnqy3maEjaht0Lw",
+  "tags": []
+}
