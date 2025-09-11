@@ -12,7 +12,7 @@ This project is a WhatsApp & Gmail Automation Workflow built using n8n, designed
 
 🛠 No-Code Friendly – Fully built inside n8n, easy to customize and scale.
 
-#🧠 Use Cases
+# Use Cases
 
 Automated follow-ups via email or WhatsApp.
 
@@ -20,7 +20,7 @@ Alerts or notifications for personal or business purposes.
 
 Combining Gmail and WhatsApp for seamless communication workflows.
 
-#🚀 Getting Started
+# Getting Started
 
 Download the Whatsapp + Gmail Agent.json file.
 
