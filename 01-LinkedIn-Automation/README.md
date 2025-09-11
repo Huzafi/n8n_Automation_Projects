@@ -3,7 +3,7 @@
 
 This project is a LinkedIn Auto-Posting Workflow built using n8n, designed to make content publishing effortless.
 
-✨ Features
+# Features
 
 📅 Automatic Posting – Publish posts on your LinkedIn profile without manual effort.
 
@@ -13,7 +13,7 @@ This project is a LinkedIn Auto-Posting Workflow built using n8n, designed to ma
 
 🛠 No-Code Friendly – Fully built inside n8n, easy to customize and scale.
 
-🧠 Use Cases
+# Use Cases
 
 Personal branding and daily posting.
 
@@ -21,9 +21,9 @@ Sharing blogs, project updates, or announcements.
 
 Maintaining consistent LinkedIn activity without missing a day.
 
-🚀 Getting Started
+# Getting Started
 
-Copy The Linkedin Agent.json file.
+Download The Linkedin Agent.json file.
 
 Import the workflow into your n8n instance.
 
