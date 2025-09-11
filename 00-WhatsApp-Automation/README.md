@@ -19,3 +19,5 @@ This n8n workflow automatically responds to WhatsApp messages, handles FAQs, and
 ✅ **Result:**  
 Saves time by replying automatically and streamlining customer interactions.
 
+## 🎥 Demo Video
+[▶ Watch Demo Video](https://drive.google.com/file/d/1i5f-a82AvNJGqOxcHGCoL6HUK8ij2-y5/view?usp=sharing)
