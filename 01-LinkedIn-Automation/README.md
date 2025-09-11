@@ -1,5 +1,5 @@
 
-LinkedIn Automation (n8n Workflow)
+##LinkedIn Automation (n8n Workflow)
 
 This project is a LinkedIn Auto-Posting Workflow built using n8n, designed to make content publishing effortless.
 
@@ -32,3 +32,6 @@ Add your LinkedIn API credentials.
 Customize post content and schedule.
 
 Activate the workflow — and watch the magic happen!
+
+## 🌐 Live Demo
+Check the workflow in action: [Live Demo](https://drive.google.com/file/d/1i7Cbp57p2CKFkMOP4JV2BKEzoFxxLQsV/view?usp=sharing)
