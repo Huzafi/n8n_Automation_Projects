@@ -1,4 +1,4 @@
-# Gmail Priority Categorization Agent
+# Gmail Agent
 
 This project is an automated Gmail Agent built using n8n, designed to intelligently categorize incoming emails into High, Medium, and Low priority levels based on pre-defined keywords and rules.
 
@@ -33,3 +33,7 @@ n8n – Workflow automation
 Gmail API – Fetch and manage emails
 
 JavaScript/JSON – Custom rule definitions
+
+## 🌐 Live Demo
+Check the workflow in action: [Live Demo](https://drive.google.com/file/d/1iEnx7u2yrzS0kyNhnZy2_pa_Pb2F46JW/view)
+
