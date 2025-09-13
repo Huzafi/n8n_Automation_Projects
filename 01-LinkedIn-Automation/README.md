@@ -1,6 +1,9 @@
 
 # LinkedIn Automation (n8n Workflow)
 
+![Project Screenshot](https://i.postimg.cc/NML76qCL/Whats-App-Image-2025-09-13-at-13-52-04.jpg)
+
+
 This project is a LinkedIn Auto-Posting Workflow built using n8n, designed to make content publishing effortless.
 
 # Features
