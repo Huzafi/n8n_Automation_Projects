@@ -1,5 +1,8 @@
 # WhatsApp + Gmail Automation (n8n Workflow)
 
+![Project Screenshot](https://i.postimg.cc/fyGJ6xRx/Whats-App-Image-2025-09-13-at-00-31-31-1.jpg)
+
+
 This project is a WhatsApp & Gmail Automation Workflow built using n8n, designed to streamline communication effortlessly.
 
 #✨ Features
