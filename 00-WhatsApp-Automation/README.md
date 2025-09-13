@@ -1,4 +1,7 @@
-# 📱 WhatsApp Automation Workflow  
+# 📱 WhatsApp Automation Workflow 
+
+![Project Screenshot](https://i.postimg.cc/C5w9NKDS/Whats-App-Image-2025-09-13-at-14-29-17.jpg)
+
 
 This n8n workflow automatically responds to WhatsApp messages, handles FAQs, and can trigger actions based on keywords. The output of this workflow is just like wrking Meta AI 
 
