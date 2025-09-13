@@ -1,5 +1,8 @@
 # Gmail Agent
 
+![Project Screenshot](https://i.postimg.cc/7LHpyhhc/Whats-App-Image-2025-09-13-at-13-55-37.jpg)
+
+
 This project is an automated Gmail Agent built using n8n, designed to intelligently categorize incoming emails into High, Medium, and Low priority levels based on pre-defined keywords and rules.
 
 # Features
