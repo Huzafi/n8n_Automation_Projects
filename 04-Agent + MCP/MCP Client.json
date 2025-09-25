@@ -1,0 +1,117 @@
+{
+  "name": "MCP Client",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -288,
+        -112
+      ],
+      "id": "63baad38-57f5-4688-bcc1-72422bbef82d",
+      "name": "When chat message received",
+      "webhookId": "f63443ca-c3c4-4539-b9d4-3f2f2157b272"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        -112
+      ],
+      "id": "a55a27bf-df89-46f2-910d-aaa386e009fd",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        80
+      ],
+      "id": "ce794dd9-d08d-46c6-8f36-8f688d533101",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "iXdWTYnRD1zwRC8W",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "endpointUrl": "https://k-amna-576.app.n8n.cloud/mcp/mcp-server",
+        "include": "selected",
+        "includeTools": [
+          "calculator",
+          "Send_a_message_in_Gmail"
+        ],
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        64
+      ],
+      "id": "08223785-2dd8-4798-b8b6-9b2c9af12317",
+      "name": "MCP Client"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP Client": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "17618dbf-5b07-4a84-8777-ac03c2d292b0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4b9822b446f316cc6a1c180c76017b78b9ce23668835d8a3ec2701669d5f2640"
+  },
+  "id": "5LtAjVLMKktogrlb",
+  "tags": []
+}
