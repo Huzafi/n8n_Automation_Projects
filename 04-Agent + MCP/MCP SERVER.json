@@ -1,0 +1,89 @@
+{
+  "name": "MCP SERVER",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        16
+      ],
+      "id": "9800f238-52e3-472b-9f8c-2bc42c9a7a8c",
+      "name": "Calculator"
+    },
+    {
+      "parameters": {
+        "path": "mcp-server"
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+      "typeVersion": 2,
+      "position": [
+        -176,
+        -144
+      ],
+      "id": "e553724e-392c-4130-aab6-eb001881e2dd",
+      "name": "MCP SERVER",
+      "webhookId": "e5e5488a-8192-46b0-8890-c8831c844fd1"
+    },
+    {
+      "parameters": {
+        "sendTo": "huzai567823@gmail.com",
+        "subject": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Subject', ``, 'string') }}",
+        "message": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.1,
+      "position": [
+        -96,
+        64
+      ],
+      "id": "d81b399c-0a89-46b3-a095-039281dc33f9",
+      "name": "Gmail Tool",
+      "webhookId": "842b7c6c-ffad-45d7-82e5-17218acc115d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "KX7BZ9wq0xYRoqOm",
+          "name": "Gmail account 4"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Calculator": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP SERVER",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP SERVER",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1f79180a-6548-425b-b588-40d57dd61f57",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4b9822b446f316cc6a1c180c76017b78b9ce23668835d8a3ec2701669d5f2640"
+  },
+  "id": "nzCOQGXXmfDQcahq",
+  "tags": []
+}
