@@ -1,4 +1,4 @@
-# 🏥 AI Hospital Appointment Assistant — V2
+# 🏥 AI Hospital Appointment Assistant 
 
 An AI-powered hospital appointment assistant that enables patients to interact naturally through voice, describe their health concerns, find the relevant medical specialty, select an available doctor and appointment slot, and book an appointment automatically.
 
