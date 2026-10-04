@@ -1,0 +1,291 @@
+{
+  "name": "Hospital - Check Availability",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "check-availability",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -240,
+        -240
+      ],
+      "id": "3de7e4a9-a2c4-48eb-8476-6fbe1d170f86",
+      "name": "Webhook",
+      "webhookId": "f63701d8-e13b-45bb-86ee-3b7fb437bf21"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40",
+          "mode": "list",
+          "cachedResultName": "AI Hospital Appointment System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1379252742,
+          "mode": "list",
+          "cachedResultName": "Doctor_Availability",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit#gid=1379252742"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "doctor_id",
+              "lookupValue": "={{ $json.body.doctor_id }}"
+            },
+            {
+              "lookupColumn": "status",
+              "lookupValue": "active"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        64,
+        -304
+      ],
+      "id": "9862d6ec-6d38-4a9e-8f4f-8e6c3b9230d2",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "MoIPdyuRTgveIqzy",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const requestedDate = $('Webhook').item.json.body.date;\n\nif (!requestedDate) {\n  throw new Error('Appointment date is required.');\n}\n\nconst date = new Date(`${requestedDate}T00:00:00`);\n\nif (isNaN(date.getTime())) {\n  throw new Error('Invalid appointment date.');\n}\n\nconst weekdays = [\n  'Sunday',\n  'Monday',\n  'Tuesday',\n  'Wednesday',\n  'Thursday',\n  'Friday',\n  'Saturday'\n];\n\nconst requestedDay = weekdays[date.getDay()];\n\nconst matchingRows = $input.all().filter(item => {\n  return item.json.day === requestedDay;\n});\n\nreturn matchingRows.map(item => ({\n  json: {\n    ...item.json,\n    requested_date: requestedDate,\n    requested_day: requestedDay\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        -304
+      ],
+      "id": "e2984f26-cd94-4d3a-984a-aeb0dfc53b0e",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst output = [];\n\nfor (const item of items) {\n  const {\n    doctor_id,\n    requested_date,\n    start_time,\n    end_time,\n    slot_duration\n  } = item.json;\n\n  const duration = Number(slot_duration);\n\n  if (!doctor_id || !requested_date || !start_time || !end_time || !duration) {\n    continue;\n  }\n\n  const [startHour, startMinute] = start_time.split(':').map(Number);\n  const [endHour, endMinute] = end_time.split(':').map(Number);\n\n  let currentMinutes = startHour * 60 + startMinute;\n  const endMinutes = endHour * 60 + endMinute;\n\n  while (currentMinutes + duration <= endMinutes) {\n    const hour = Math.floor(currentMinutes / 60);\n    const minute = currentMinutes % 60;\n\n    const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;\n\n    output.push({\n      json: {\n        doctor_id,\n        date: requested_date,\n        time,\n        slot_duration: duration\n      }\n    });\n\n    currentMinutes += duration;\n  }\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        -288
+      ],
+      "id": "316007df-ff6e-408c-96ec-8d04970790a7",
+      "name": "Generate Appointment Slots"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40",
+          "mode": "list",
+          "cachedResultName": "AI Hospital Appointment System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Appointments",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        512,
+        192
+      ],
+      "id": "351d7df6-40af-435d-aa73-24d42612689e",
+      "name": "Get row(s) in sheet1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "MoIPdyuRTgveIqzy",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        752,
+        -80
+      ],
+      "id": "3d2cd38b-983a-44b5-b91e-ef2d0b15cbf3",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// Generated appointment slots\nconst slots = items.filter(item => {\n  return item.json.slot_duration;\n});\n\n// Existing booked appointments\nconst bookedAppointments = items.filter(item => {\n  return (\n    item.json.appointment_id &&\n    item.json.doctor_id &&\n    item.json.date &&\n    item.json.time &&\n    item.json.status === 'booked'\n  );\n});\n\n// Create a quick lookup of already booked slots\nconst bookedSlots = new Set(\n  bookedAppointments.map(item =>\n    `${item.json.doctor_id}|${item.json.date}|${item.json.time}`\n  )\n);\n\n// Remove already booked slots\nconst availableSlots = slots.filter(item => {\n  const key = `${item.json.doctor_id}|${item.json.date}|${item.json.time}`;\n\n  return !bookedSlots.has(key);\n});\n\nreturn availableSlots;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        -80
+      ],
+      "id": "c749ad16-c59c-4bea-967a-65c6894d1131",
+      "name": "Filter Available Slots"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1408,
+        -80
+      ],
+      "id": "6843bdeb-88a0-4943-aba7-defa5fde0e0a",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const slots = $input.all();\n\nif (slots.length === 0) {\n  return [\n    {\n      json: {\n        success: true,\n        doctor_id: null,\n        date: null,\n        available_slots: []\n      }\n    }\n  ];\n}\n\nconst doctor_id = slots[0].json.doctor_id;\nconst date = slots[0].json.date;\n\nconst available_slots = slots.map(item => item.json.time);\n\nreturn [\n  {\n    json: {\n      success: true,\n      doctor_id,\n      date,\n      available_slots\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -80
+      ],
+      "id": "65fd788f-f9ad-4432-b8d8-44320dbcd925",
+      "name": "Build Availability Response"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get row(s) in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Generate Appointment Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Appointment Slots": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Filter Available Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Filter Available Slots": {
+      "main": [
+        [
+          {
+            "node": "Build Availability Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Availability Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0d6558aa-aa48-4872-b254-800832929210",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "101186ef24fee5d0ada83554df7efe118c7496169951499e3e8d069ead4da735"
+  },
+  "nodeGroups": [],
+  "id": "u2Hn8Xqt5nx5SokE",
+  "tags": []
+}

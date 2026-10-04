@@ -1,0 +1,168 @@
+{
+  "name": "Hospital - Route Patient",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "route-patient",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a8679ef7-9cd5-4615-b5c0-d848b51e25ec",
+      "name": "Webhook",
+      "webhookId": "cd362fb6-0841-4562-b91b-9e7a2b9f0fcc"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40",
+          "mode": "list",
+          "cachedResultName": "AI Hospital Appointment System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1413045674,
+          "mode": "list",
+          "cachedResultName": "Concern_Routing",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit#gid=1413045674"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "specialty_id",
+              "lookupValue": "={{ $json.body.specialty_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "ebaf3e1b-e944-4ab6-b364-b12cd7194737",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "MoIPdyuRTgveIqzy",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40",
+          "mode": "list",
+          "cachedResultName": "AI Hospital Appointment System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 246229732,
+          "mode": "list",
+          "cachedResultName": "Specialties",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit#gid=246229732"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "specialty_id",
+              "lookupValue": "={{ $json.specialty_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        0
+      ],
+      "id": "98667608-546c-4157-9692-3e336dc83fec",
+      "name": "Get row(s) in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "MoIPdyuRTgveIqzy",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"specialty_id\": \"{{ $json.specialty_id }}\",\n  \"specialty_name\": \"{{ $json.specialty_name }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        0
+      ],
+      "id": "eb739ae3-81d5-47ce-b507-d85976b0df8b",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "829657e8-9c94-4179-b6e8-7946c55dbd04",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "101186ef24fee5d0ada83554df7efe118c7496169951499e3e8d069ead4da735"
+  },
+  "nodeGroups": [],
+  "id": "37jzJHDcxmCNBjl1",
+  "tags": []
+}

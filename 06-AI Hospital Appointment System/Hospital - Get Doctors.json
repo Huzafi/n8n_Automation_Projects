@@ -1,0 +1,121 @@
+{
+  "name": "Hospital - Get Doctors",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "get-doctors",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "7ecf3998-3a7e-41b5-be34-d54ebcc6426c",
+      "name": "Webhook",
+      "webhookId": "c09d9e00-1801-4b97-a87c-debd425bf976"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40",
+          "mode": "list",
+          "cachedResultName": "AI Hospital Appointment System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2043474629,
+          "mode": "list",
+          "cachedResultName": "Doctors",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit#gid=2043474629"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "specialty_id",
+              "lookupValue": "={{ $json.body.specialty_id }}"
+            },
+            {
+              "lookupColumn": "status",
+              "lookupValue": "active"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "d28838fe-27f5-4e43-87cd-bd88a0ceb5c3",
+      "name": "Get row(s) in sheet",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mZNjGNRRpNeFkZja",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"specialty_id\": \"{{ $('Webhook').item.json.body.specialty_id }}\",\n  \"doctors\": [\n    {\n      \"doctor_id\": \"{{ $json.doctor_id }}\",\n      \"doctor_name\": \"{{ $json.doctor_name }}\",\n      \"department\": \"{{ $json.department }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "3147de0b-83cf-415d-ad29-3aef82cf1ed9",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "27035fb4-e425-4857-a9a4-3ec823623908",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "101186ef24fee5d0ada83554df7efe118c7496169951499e3e8d069ead4da735"
+  },
+  "nodeGroups": [],
+  "id": "WTsaDnyloX8hGT6n",
+  "tags": []
+}

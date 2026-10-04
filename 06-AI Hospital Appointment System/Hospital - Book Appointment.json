@@ -1,0 +1,394 @@
+{
+  "name": "Hospital - Book Appointment",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "book-appointment",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -96,
+        -272
+      ],
+      "id": "371dbf40-17cb-4e01-9dfa-7169389dde50",
+      "name": "Webhook",
+      "webhookId": "47cc68d6-c2d8-4d3f-9d7b-19487b0d4f47"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook').item.json.body;\n\nconst requiredFields = [\n  'patient_name',\n  'phone_number',\n  'specialty_id',\n  'doctor_id',\n  'date',\n  'time',\n  'reason'\n];\n\nconst missingFields = requiredFields.filter(field => {\n  return !body[field] || String(body[field]).trim() === '';\n});\n\nif (missingFields.length > 0) {\n  return [\n    {\n      json: {\n        success: false,\n        error: 'missing_fields',\n        message: `Missing required booking fields: ${missingFields.join(', ')}`,\n        missing_fields: missingFields\n      }\n    }\n  ];\n}\n\nreturn [\n  {\n    json: {\n      success: true,\n      patient_name: String(body.patient_name).trim(),\n      phone_number: String(body.phone_number).trim(),\n      specialty_id: String(body.specialty_id).trim(),\n      doctor_id: String(body.doctor_id).trim(),\n      date: String(body.date).trim(),\n      time: String(body.time).trim(),\n      reason: String(body.reason).trim()\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        -272
+      ],
+      "id": "838de859-7958-43c2-81e2-9013eaf945f8",
+      "name": "Validate Booking Request"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40",
+          "mode": "list",
+          "cachedResultName": "AI Hospital Appointment System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Appointments",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        416,
+        -272
+      ],
+      "id": "162ad4a9-14e8-40f7-8e33-2df729539f72",
+      "name": "Get row(s) in sheet",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "MoIPdyuRTgveIqzy",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $('Validate Booking Request').item.json;\nconst appointments = $input.all();\n\nconst requestedDoctor = input.doctor_id;\nconst requestedDate = input.date;\nconst requestedTime = input.time;\n\nconst alreadyBooked = appointments.some(item => {\n  const appointment = item.json;\n\n  return (\n    appointment.doctor_id === requestedDoctor &&\n    appointment.date === requestedDate &&\n    appointment.time === requestedTime &&\n    appointment.status === 'booked'\n  );\n});\n\nif (alreadyBooked) {\n  return [\n    {\n      json: {\n        success: false,\n        error: 'slot_unavailable',\n        message: 'The selected appointment slot is no longer available.',\n        doctor_id: requestedDoctor,\n        date: requestedDate,\n        time: requestedTime\n      }\n    }\n  ];\n}\n\nreturn [\n  {\n    json: {\n      ...input,\n      slot_available: true\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        -272
+      ],
+      "id": "aaac4329-43c2-4aaa-ad72-1fe7014aaef0",
+      "name": "Check Slot Already Booked"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nconst appointmentId = `APT-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;\n\nreturn [\n  {\n    json: {\n      ...$json,\n      appointment_id: appointmentId\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        -176
+      ],
+      "id": "be0dc028-ac34-4560-bdc6-b5e6e3b29d4e",
+      "name": "Generate Appointment ID"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40",
+          "mode": "list",
+          "cachedResultName": "AI Hospital Appointment System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Appointments",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17qxyWces_61oaoxRuHRPfVlh9Hd-B_c1SmenCFNdL40/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "appointment_id": "={{ $json.appointment_id }}",
+            "patient_name": "={{ $json.patient_name }}",
+            "phone_number": "={{ $json.phone_number }}",
+            "speciality_id": "={{ $json.specialty_id }}",
+            "doctor_id": "={{ $json.doctor_id }}",
+            "date": "={{ $json.date }}",
+            "time": "={{ $json.time }}",
+            "reason": "={{ $json.reason }}",
+            "status": "booked"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "appointment_id",
+              "displayName": "appointment_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "patient_name",
+              "displayName": "patient_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone_number",
+              "displayName": "phone_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "speciality_id",
+              "displayName": "speciality_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "doctor_id",
+              "displayName": "doctor_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1280,
+        0
+      ],
+      "id": "6bd6d90f-d98a-4227-b7c4-86fceda7851d",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "MoIPdyuRTgveIqzy",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "263da537-e74e-4d01-a701-c7a01a783740",
+              "leftValue": "={{ $json.slot_available }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        688,
+        32
+      ],
+      "id": "347df538-e4cd-4915-87e2-f7041d9a40be",
+      "name": "Slot Available?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"error\": \"slot_unavailable\",\n  \"message\": \"The selected appointment slot is no longer available.\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        976,
+        176
+      ],
+      "id": "b1536ff9-f346-4b61-8f33-a1bf393d5bda",
+      "name": "Booking Failed Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"appointment_id\": \"{{ $('Generate Appointment ID').item.json.appointment_id }}\",\n  \"message\": \"Appointment has been successfully booked.\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1504,
+        0
+      ],
+      "id": "57a98c95-3ffc-44e7-ba89-45188f51424c",
+      "name": "Booking Success Response"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Booking Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Booking Request": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Check Slot Already Booked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Slot Already Booked": {
+      "main": [
+        [
+          {
+            "node": "Slot Available?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Appointment ID": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slot Available?": {
+      "main": [
+        [
+          {
+            "node": "Generate Appointment ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Booking Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Booking Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "af853814-746e-4706-8aa2-28680ad77eb5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "101186ef24fee5d0ada83554df7efe118c7496169951499e3e8d069ead4da735"
+  },
+  "nodeGroups": [],
+  "id": "a51gSGx1qAgHPBYM",
+  "tags": []
+}
