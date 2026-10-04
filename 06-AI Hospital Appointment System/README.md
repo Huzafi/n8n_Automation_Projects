@@ -1,5 +1,7 @@
 # 🏥 AI Hospital Appointment Assistant 
 
+[![image.png](https://i.postimg.cc/DyHnKJyV/image.png)](https://postimg.cc/WhGQG4kS)
+
 An AI-powered hospital appointment assistant that enables patients to interact naturally through voice, describe their health concerns, find the relevant medical specialty, select an available doctor and appointment slot, and book an appointment automatically.
 
 This project combines **ElevenLabs Voice AI**, **n8n workflow automation**, and **Google Sheets** to create an end-to-end AI-powered appointment scheduling system.
