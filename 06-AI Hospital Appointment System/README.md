@@ -12,10 +12,9 @@ This project combines **ElevenLabs Voice AI**, **n8n workflow automation**, and 
 
 ## 🎥 Live Demo
 
-> 🚧 **Live demo video will be added soon.**
 
 **Watch the Full Project Demonstration:**
-[▶️ Live Demo Video](#)
+[▶️ Live Demo Video](https://drive.google.com/file/d/1z8HhOvituXF3_GaConVdoLZgGB7_C-Bj/view?usp=sharing)
 
 ---
 
