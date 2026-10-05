@@ -759,7 +759,7 @@ This approach helps make the system more predictable, testable and easier to ext
 
 The complete live demonstration video will be added here:
 
-[▶️ Watch the Full AI Hospital Appointment Assistant Demo](#)
+[▶️ Watch the Full AI Hospital Appointment Assistant Demo](https://drive.google.com/file/d/1z8HhOvituXF3_GaConVdoLZgGB7_C-Bj/view?usp=sharing)
 
 ---
 
