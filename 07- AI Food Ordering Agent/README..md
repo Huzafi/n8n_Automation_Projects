@@ -1,5 +1,7 @@
 # 🍔 CraveAI — AI-Powered Food Ordering Agent
 
+[![m.png](https://i.postimg.cc/Gp3f2d45/m.png)](https://postimg.cc/xX75pryv)
+
 **An AI-powered food ordering assistant built with ElevenLabs, n8n, and Google Sheets to demonstrate conversational ordering, menu discovery, delivery validation, customer management, and order processing.**
 
 CraveAI is a portfolio prototype exploring how conversational AI and workflow automation can streamline a food ordering experience. A voice-enabled agent can help customers explore menu options, check delivery availability, provide customer details, and submit orders through connected workflows.
@@ -8,6 +10,10 @@ CraveAI is a portfolio prototype exploring how conversational AI and workflow au
 > **Stack:** ElevenLabs · n8n Cloud · Google Sheets · Webhooks  
 > **Purpose:** Demonstrate AI agent integrations and workflow automation
 
+
+
+**Watch the Full Project Demonstration:**
+[▶️ Live Demo Video](https://elevenlabs.io/app/talk-to?agent_id=agent_4801m5wxk4e5fkcaan3pqf5319kh&branch_id=agtbrch_2001m5wxk5pnfd1rkrm2e7beq0tk)
 ---
 
 ## 📌 Table of Contents
