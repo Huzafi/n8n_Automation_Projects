@@ -1,0 +1,218 @@
+{
+  "name": "CraveAI — Workflow B: Delivery Zone Check",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "craveai-delivery-zone-check",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "7ac8289c-9705-43e8-9659-0dbfea968f6f",
+      "name": "Delivery Zone Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        80
+      ],
+      "webhookId": "29ce94b1-7c5c-49c9-8a9e-fe36384eecb9"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validates and normalizes the delivery-zone request. No external calls.\nconst MAX_TEXT = 100;\nconst DEFAULT_CITY = 'Karachi';\n\nconst raw = $input.first().json || {};\nlet body = raw.body;\nif (typeof body === 'string') {\n  try { body = JSON.parse(body); } catch (e) { body = null; }\n}\n\nconst errors = [];\nif (!body || typeof body !== 'object' || Array.isArray(body)) {\n  errors.push('Request body must be a JSON object.');\n  body = {};\n}\n\nlet area = null;\nif (body.area === undefined || body.area === null) {\n  errors.push('area is required.');\n} else if (typeof body.area !== 'string') {\n  errors.push('area must be a string.');\n} else if (body.area.trim().length === 0) {\n  errors.push('area must not be empty.');\n} else if (body.area.trim().length > MAX_TEXT) {\n  errors.push('area must be at most ' + MAX_TEXT + ' characters.');\n} else {\n  area = body.area.trim();\n}\n\nlet city = DEFAULT_CITY;\nif (body.city !== undefined && body.city !== null) {\n  if (typeof body.city !== 'string') {\n    errors.push('city must be a string when provided.');\n  } else if (body.city.trim().length > MAX_TEXT) {\n    errors.push('city must be at most ' + MAX_TEXT + ' characters.');\n  } else if (body.city.trim().length > 0) {\n    city = body.city.trim();\n  }\n}\n\nif (errors.length > 0) {\n  return [{ json: {\n    valid: false,\n    statusCode: 400,\n    body: {\n      success: false,\n      serviceable: false,\n      error: 'invalid_request',\n      message: 'Invalid delivery request: ' + errors.join(' '),\n      details: errors,\n    },\n  } }];\n}\n\nreturn [{ json: { valid: true, request: { area: area, city: city } } }];\n"
+      },
+      "id": "5ec62221-0ab4-4c3c-bbd4-a92d000f1e25",
+      "name": "Validate Delivery Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid-check",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d7303775-0beb-4b7e-b718-09f328fb4718",
+      "name": "Is Request Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw",
+          "cachedResultName": "CraveAI — Master Database"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "740735737",
+          "cachedResultName": "Delivery_Zones"
+        },
+        "options": {}
+      },
+      "id": "66ecd189-4d68-41fa-b464-62455e758ce0",
+      "name": "Read Delivery Zones Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fGEZxtENOuk2NtTk",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Matches the requested area/city against Delivery_Zones rows. Never invents fees or ETAs.\ntry {\n  const req = $('Validate Delivery Request').first().json.request;\n  const items = $input.all();\n\n  const dbError = function (code, message) {\n    return [{ json: { statusCode: code === 'database_unavailable' ? 503 : 500, body: {\n      success: false, serviceable: false, error: code, message: message,\n    } } }];\n  };\n\n  // Google Sheets read failure (node continues with an error item).\n  if (items.some(function (i) { return i && i.json && i.json.error; })) {\n    return dbError('database_unavailable', 'The delivery zone database could not be read right now. Please try again shortly.');\n  }\n\n  const rows = items\n    .map(function (i) { return i && i.json ? i.json : {}; })\n    .filter(function (r) { return Object.keys(r).length > 0; });\n\n  if (rows.length === 0) {\n    return dbError('configuration_error', 'The delivery zone database has no zone records configured.');\n  }\n\n  const REQUIRED = ['zone_id', 'area_name', 'city', 'is_serviceable', 'delivery_fee', 'estimated_delivery_minutes'];\n  const present = {};\n  rows.forEach(function (r) { Object.keys(r).forEach(function (k) { present[k] = true; }); });\n  const missingCols = REQUIRED.filter(function (c) { return !present[c]; });\n  if (missingCols.length > 0) {\n    return dbError('configuration_error', 'The delivery zone database is missing required columns: ' + missingCols.join(', ') + '.');\n  }\n\n  const str = function (v) { return v === null || v === undefined ? '' : String(v).trim(); };\n  const norm = function (v) { return str(v).toLowerCase(); };\n  const isTrue = function (v) {\n    if (v === true) return true;\n    if (typeof v === 'number') return v === 1;\n    if (typeof v !== 'string') return false;\n    const s = v.trim().toLowerCase();\n    return s === 'true' || s === 'yes' || s === '1';\n  };\n  const toNonNegNumber = function (v) {\n    if (v === null || v === undefined) return null;\n    if (typeof v === 'number') return Number.isFinite(v) && v >= 0 ? v : null;\n    const s = String(v).trim();\n    if (s === '') return null;\n    const n = Number(s.replace(/,/g, ''));\n    return Number.isFinite(n) && n >= 0 ? n : null;\n  };\n\n  const wantArea = norm(req.area);\n  const wantCity = norm(req.city);\n  const matches = rows.filter(function (r) {\n    return norm(r.area_name) === wantArea && norm(r.city) === wantCity;\n  });\n\n  if (matches.length === 0) {\n    return [{ json: { statusCode: 404, body: {\n      success: false, serviceable: false, error: 'area_not_found',\n      area: req.area, city: req.city,\n      message: 'We could not find \"' + req.area + '\" in ' + req.city + ' in our delivery zones.',\n    } } }];\n  }\n\n  if (matches.length > 1) {\n    return [{ json: { statusCode: 409, body: {\n      success: false, serviceable: false, error: 'ambiguous_zone',\n      area: req.area, city: req.city,\n      matching_zone_ids: matches.map(function (r) { return str(r.zone_id); }),\n      message: 'Multiple delivery zones match this area and city. The delivery zone database needs to be corrected before delivery can be confirmed.',\n    } } }];\n  }\n\n  const z = matches[0];\n  const zoneInfo = { zone_id: str(z.zone_id), area_name: str(z.area_name), city: str(z.city) };\n\n  if (!isTrue(z.is_serviceable)) {\n    const notes = str(z.notes);\n    return [{ json: { statusCode: 200, body: {\n      success: true, serviceable: false, error: 'delivery_unavailable',\n      zone: zoneInfo,\n      message: 'Delivery is currently not available in this area.' + (notes ? ' ' + notes : ''),\n    } } }];\n  }\n\n  const fee = toNonNegNumber(z.delivery_fee);\n  const eta = toNonNegNumber(z.estimated_delivery_minutes);\n  if (!zoneInfo.zone_id || fee === null || eta === null) {\n    const bad = [];\n    if (!zoneInfo.zone_id) bad.push('zone_id');\n    if (fee === null) bad.push('delivery_fee');\n    if (eta === null) bad.push('estimated_delivery_minutes');\n    return dbError('configuration_error', 'The matching delivery zone has missing or invalid data (' + bad.join(', ') + '), so delivery cannot be confirmed.');\n  }\n\n  return [{ json: { statusCode: 200, body: {\n    success: true, serviceable: true,\n    zone: {\n      zone_id: zoneInfo.zone_id,\n      area_name: zoneInfo.area_name,\n      city: zoneInfo.city,\n      delivery_fee: fee,\n      estimated_delivery_minutes: eta,\n    },\n    message: 'Delivery is available in this area.',\n  } } }];\n} catch (err) {\n  return [{ json: { statusCode: 500, body: {\n    success: false, serviceable: false, error: 'internal_error',\n    message: 'Something went wrong while checking the delivery zone. Please try again.',\n  } } }];\n}\n"
+      },
+      "id": "b46a8839-19a7-4a08-bf6d-3eb56351ec00",
+      "name": "Match and Validate Delivery Zone",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "0346e586-9466-4ca6-a29d-4c61c2b7df43",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        848,
+        240
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Delivery Zone Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Delivery Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Delivery Request": {
+      "main": [
+        [
+          {
+            "node": "Is Request Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Request Valid?": {
+      "main": [
+        [
+          {
+            "node": "Read Delivery Zones Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Delivery Zones Sheet": {
+      "main": [
+        [
+          {
+            "node": "Match and Validate Delivery Zone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match and Validate Delivery Zone": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "a9ce3778-1271-4496-a70f-3350de8c4f78",
+  "meta": {
+    "instanceId": "86fc514573f11a71a1cbedea8cfb7fb3febee820a6a7bc3b2d2e67f9ce6a3ccf"
+  },
+  "nodeGroups": [],
+  "id": "GqDGoVJoctnpqvan",
+  "tags": []
+}

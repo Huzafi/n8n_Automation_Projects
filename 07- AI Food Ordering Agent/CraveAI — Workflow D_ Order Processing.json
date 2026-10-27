@@ -1,0 +1,849 @@
+{
+  "name": "CraveAI — Workflow D: Order Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "craveai-order-processing",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "9b33a89c-c7e8-4959-a83b-55fdbc00bf36",
+      "name": "Order Processing Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -848,
+        -336
+      ],
+      "webhookId": "1a20492d-bd4b-455d-ada1-1cff23feeba0"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validates the incoming order request. No external calls, no writes.\n// Prices and delivery fees supplied by the caller are never used.\nconst MAX_ITEMS = 50;\nconst MAX_QTY = 100;\nconst LIMITS = { customer_id: 64, restaurant_id: 64, menu_item_id: 64, delivery_address: 300, area_name: 100, payment_method: 50, variant: 50 };\n\nconst raw = $input.first().json || {};\nlet body = raw.body;\nif (typeof body === 'string') {\n  try { body = JSON.parse(body); } catch (e) { body = null; }\n}\n\nconst errors = [];\nif (!body || typeof body !== 'object' || Array.isArray(body)) {\n  errors.push('Request body must be a JSON object.');\n  body = {};\n}\n\nconst requiredText = function (obj, field, label) {\n  const name = label || field;\n  let v = obj[field];\n  if (v === undefined || v === null) { errors.push(name + ' is required.'); return null; }\n  if (typeof v === 'number' && (field.indexOf('_id') !== -1)) v = String(v);\n  if (typeof v !== 'string') { errors.push(name + ' must be a string.'); return null; }\n  const t = v.trim().replace(/\\s+/g, ' ');\n  if (t.length === 0) { errors.push(name + ' must not be empty.'); return null; }\n  if (t.length > LIMITS[field]) { errors.push(name + ' must be at most ' + LIMITS[field] + ' characters.'); return null; }\n  return t;\n};\n\nconst customer_id = requiredText(body, 'customer_id');\nconst restaurant_id = requiredText(body, 'restaurant_id');\nconst delivery_address = requiredText(body, 'delivery_address');\nconst area_name = requiredText(body, 'area_name');\nconst payment_method = requiredText(body, 'payment_method');\n\nlet confirmationMissing = false;\nif (body.customer_confirmed !== true) {\n  confirmationMissing = true;\n  errors.push('customer_confirmed must be the boolean true. The customer must explicitly confirm the final order summary and total before the order is processed.');\n}\n\nconst items = [];\nif (body.items === undefined || body.items === null) {\n  errors.push('items is required.');\n} else if (!Array.isArray(body.items)) {\n  errors.push('items must be an array.');\n} else if (body.items.length === 0) {\n  errors.push('items must contain at least one item.');\n} else if (body.items.length > MAX_ITEMS) {\n  errors.push('items must contain at most ' + MAX_ITEMS + ' entries.');\n} else {\n  const seen = {};\n  body.items.forEach(function (it, idx) {\n    const label = 'items[' + idx + ']';\n    if (!it || typeof it !== 'object' || Array.isArray(it)) { errors.push(label + ' must be an object.'); return; }\n    const menu_item_id = requiredText(it, 'menu_item_id', label + '.menu_item_id');\n\n    let quantity = null;\n    const q = it.quantity;\n    if (q === undefined || q === null || q === '') {\n      errors.push(label + '.quantity is required.');\n    } else if (typeof q === 'number' && Number.isInteger(q) && q >= 1) {\n      quantity = q;\n    } else if (typeof q === 'string' && /^[1-9][0-9]*$/.test(q.trim())) {\n      quantity = Number(q.trim());\n    } else {\n      errors.push(label + '.quantity must be a positive whole number.');\n    }\n    if (quantity !== null && quantity > MAX_QTY) {\n      errors.push(label + '.quantity must be at most ' + MAX_QTY + '.');\n      quantity = null;\n    }\n\n    // Optional: only needed when the menu sheet stores several size prices on one row.\n    let variant = null;\n    if (it.variant !== undefined && it.variant !== null && it.variant !== '') {\n      variant = requiredText(it, 'variant', label + '.variant');\n    }\n\n    if (menu_item_id !== null) {\n      const key = menu_item_id + '|' + (variant || '').toLowerCase();\n      if (seen[key]) {\n        errors.push(label + ' repeats menu_item_id ' + menu_item_id + '. Combine the quantity into a single entry.');\n      }\n      seen[key] = true;\n    }\n    if (menu_item_id !== null && quantity !== null) {\n      items.push({ menu_item_id: menu_item_id, quantity: quantity, variant: variant });\n    }\n  });\n}\n\nlet discount = 0;\nconst d = body.discount;\nif (d !== undefined && d !== null && d !== '') {\n  const n = typeof d === 'number' ? d : (typeof d === 'string' && /^[0-9]+(\\.[0-9]+)?$/.test(d.trim()) ? Number(d.trim()) : NaN);\n  if (!Number.isFinite(n) || n < 0) errors.push('discount must be a non-negative number when provided.');\n  else discount = Math.round(n * 100) / 100;\n}\n\nif (errors.length > 0) {\n  const onlyConfirmation = confirmationMissing && errors.length === 1;\n  return [{ json: {\n    valid: false,\n    statusCode: 400,\n    body: {\n      success: false,\n      error: onlyConfirmation ? 'customer_confirmation_required' : 'invalid_request',\n      message: onlyConfirmation\n        ? 'The order was not processed because the customer has not explicitly confirmed it.'\n        : 'Invalid order request: ' + errors.join(' '),\n      details: errors,\n    },\n  } }];\n}\n\nreturn [{ json: {\n  valid: true,\n  request: {\n    customer_id: customer_id,\n    restaurant_id: restaurant_id,\n    delivery_address: delivery_address,\n    area_name: area_name,\n    payment_method: payment_method,\n    discount: discount,\n    items: items,\n  },\n} }];\n"
+      },
+      "id": "0b354fce-53bc-4d87-9f94-76b80fec42d6",
+      "name": "Validate Order Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        -592
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid-check",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8adde739-0ca2-43b3-a6b0-5a99439200ae",
+      "name": "Is Request Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        -592
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw",
+          "cachedResultName": "CraveAI — Master Database"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultName": "Restaurants"
+        },
+        "options": {}
+      },
+      "id": "baac1478-d394-4362-8907-fe9e97666947",
+      "name": "Read Restaurants",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -160,
+        -96
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fGEZxtENOuk2NtTk",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw",
+          "cachedResultName": "CraveAI — Master Database"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1708604933",
+          "cachedResultName": "Menu_Items"
+        },
+        "options": {}
+      },
+      "id": "21cbd127-c97f-42f3-b345-99095009d139",
+      "name": "Read Menu Items",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        64,
+        -96
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fGEZxtENOuk2NtTk",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw",
+          "cachedResultName": "CraveAI — Master Database"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "525924755",
+          "cachedResultName": "Customers"
+        },
+        "options": {}
+      },
+      "id": "d53b3c5f-a6c1-4b1e-831a-74f159eb264a",
+      "name": "Read Customers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        288,
+        -96
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fGEZxtENOuk2NtTk",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw",
+          "cachedResultName": "CraveAI — Master Database"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "740735737",
+          "cachedResultName": "Delivery_Zones"
+        },
+        "options": {}
+      },
+      "id": "0285e16f-13c0-4fde-875c-83da4cdfce47",
+      "name": "Read Delivery Zones",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        512,
+        -96
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fGEZxtENOuk2NtTk",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verifies every record against the sheets and calculates trusted totals.\n// Read-only: nothing is written here. Output is either { ok: true, order, items }\n// or { ok: false, statusCode, body } which goes straight to the webhook response.\ntry {\n  const req = $('Validate Order Request').first().json.request;\n\n  const fail = function (statusCode, error, message, extra) {\n    return [{ json: { ok: false, statusCode: statusCode, body: Object.assign({ success: false, error: error, message: message }, extra || {}) } }];\n  };\n\n  const str = function (v) { return v === null || v === undefined ? '' : String(v).trim(); };\n  const idKey = function (v) { return str(v).toUpperCase(); };\n  const norm = function (v) { return str(v).replace(/\\s+/g, ' ').toLowerCase(); };\n  const isTrue = function (v) {\n    if (v === true) return true;\n    if (typeof v === 'number') return v === 1;\n    if (typeof v !== 'string') return false;\n    const s = v.trim().toLowerCase();\n    return s === 'true' || s === 'yes' || s === 'y' || s === '1';\n  };\n  const toMoney = function (v) {\n    if (v === null || v === undefined) return null;\n    if (typeof v === 'number') return Number.isFinite(v) ? v : null;\n    const s = String(v).trim().replace(/,/g, '').replace(/^(pkr|rs\\.?)\\s*/i, '');\n    if (s === '' || !/^[0-9]+(\\.[0-9]+)?$/.test(s)) return null;\n    return Number(s);\n  };\n  const round2 = function (n) { return Math.round((n + Number.EPSILON) * 100) / 100; };\n\n  const readSheet = function (nodeName) {\n    const all = $(nodeName).all();\n    if (all.some(function (i) { return i && i.json && i.json.error; })) return null;\n    return all\n      .map(function (i) { return i && i.json ? i.json : {}; })\n      .filter(function (r) { return Object.keys(r).length > 0; });\n  };\n\n  const restaurants = readSheet('Read Restaurants');\n  const menu = readSheet('Read Menu Items');\n  const customers = readSheet('Read Customers');\n  const zones = readSheet('Read Delivery Zones');\n  if (!restaurants || !menu || !customers || !zones) {\n    return fail(503, 'database_unavailable', 'The order database could not be read right now. No order was saved. Please try again shortly.');\n  }\n\n  const requireColumns = function (rows, cols, sheet) {\n    const present = {};\n    rows.forEach(function (r) { Object.keys(r).forEach(function (k) { present[k] = true; }); });\n    const missing = cols.filter(function (c) { return !present[c]; });\n    return missing.length ? 'The ' + sheet + ' sheet is missing required columns: ' + missing.join(', ') + '.' : null;\n  };\n  const colErr =\n    requireColumns(customers, ['customer_id', 'customer_name', 'phone_number'], 'Customers') ||\n    requireColumns(restaurants, ['restaurant_id', 'restaurant_name', 'is_active'], 'Restaurants') ||\n    requireColumns(menu, ['menu_item_id', 'restaurant_id', 'item_name', 'is_available'], 'Menu_Items') ||\n    requireColumns(zones, ['area_name', 'is_serviceable', 'delivery_fee'], 'Delivery_Zones');\n  if (colErr) return fail(500, 'configuration_error', colErr + ' No order was saved.');\n\n  // ---- Customer ----\n  const custMatches = customers.filter(function (r) { return idKey(r.customer_id) === idKey(req.customer_id); });\n  if (custMatches.length === 0) return fail(404, 'customer_not_found', 'No customer exists with customer_id ' + req.customer_id + '.');\n  if (custMatches.length > 1) return fail(409, 'duplicate_customer_records', 'More than one customer row uses customer_id ' + req.customer_id + '. The Customers sheet must be corrected first.');\n  const customer = custMatches[0];\n  if (str(customer.customer_id) !== req.customer_id) {\n    return fail(404, 'customer_not_found', 'customer_id ' + req.customer_id + ' does not exactly match a stored customer ID.');\n  }\n\n  // ---- Restaurant ----\n  const restMatches = restaurants.filter(function (r) { return idKey(r.restaurant_id) === idKey(req.restaurant_id); });\n  if (restMatches.length === 0) return fail(404, 'restaurant_not_found', 'No restaurant exists with restaurant_id ' + req.restaurant_id + '.');\n  if (restMatches.length > 1) return fail(409, 'duplicate_restaurant_records', 'More than one restaurant row uses restaurant_id ' + req.restaurant_id + '. The Restaurants sheet must be corrected first.');\n  const restaurant = restMatches[0];\n  if (!isTrue(restaurant.is_active)) {\n    return fail(422, 'restaurant_unavailable', str(restaurant.restaurant_name) + ' is not currently accepting orders.');\n  }\n  // Opening hours (Asia/Karachi, UTC+5, no DST). Checked only when both times are present and parseable.\n  const parseTime = function (v) {\n    const m = /^([0-9]{1,2}):([0-9]{2})/.exec(str(v));\n    if (!m) return null;\n    const h = Number(m[1]), mi = Number(m[2]);\n    return h <= 24 && mi < 60 ? (h * 60 + mi) % 1440 : null;\n  };\n  const openM = parseTime(restaurant.opening_time);\n  const closeM = parseTime(restaurant.closing_time);\n  if (openM !== null && closeM !== null && openM !== closeM) {\n    const now = new Date();\n    const nowM = (now.getUTCHours() * 60 + now.getUTCMinutes() + 300) % 1440;\n    const isOpen = openM < closeM ? (nowM >= openM && nowM < closeM) : (nowM >= openM || nowM < closeM);\n    if (!isOpen) {\n      return fail(422, 'restaurant_closed', str(restaurant.restaurant_name) + ' is closed right now (hours ' + str(restaurant.opening_time) + ' to ' + str(restaurant.closing_time) + ', Karachi time).');\n    }\n  }\n\n  // ---- Menu items ----\n  // Price columns other than \"price\" (e.g. price_half / full_price) mean the row stores several size prices.\n  const variantPriceCols = function (row) {\n    return Object.keys(row).filter(function (k) {\n      return k !== 'price' && /price/i.test(k) && toMoney(row[k]) !== null && str(row[k]) !== '';\n    });\n  };\n\n  const lines = [];\n  for (let i = 0; i < req.items.length; i++) {\n    const want = req.items[i];\n    const rows = menu.filter(function (r) { return idKey(r.menu_item_id) === idKey(want.menu_item_id); });\n    if (rows.length === 0) return fail(404, 'menu_item_not_found', 'Menu item ' + want.menu_item_id + ' does not exist.', { menu_item_id: want.menu_item_id });\n    if (rows.length > 1) return fail(409, 'ambiguous_menu_item', 'Menu item ID ' + want.menu_item_id + ' appears on more than one row, so the exact item and price cannot be determined.', { menu_item_id: want.menu_item_id });\n    const m = rows[0];\n    const itemName = str(m.item_name);\n    if (idKey(m.restaurant_id) !== idKey(restaurant.restaurant_id)) {\n      return fail(422, 'item_not_from_restaurant', (itemName || want.menu_item_id) + ' (' + want.menu_item_id + ') does not belong to ' + str(restaurant.restaurant_name) + '.', { menu_item_id: want.menu_item_id });\n    }\n    if (!isTrue(m.is_available)) {\n      return fail(422, 'item_unavailable', (itemName || want.menu_item_id) + ' (' + want.menu_item_id + ') is not currently available.', { menu_item_id: want.menu_item_id });\n    }\n    if (!itemName) return fail(500, 'configuration_error', 'Menu item ' + want.menu_item_id + ' has no item_name. No order was saved.');\n\n    let unitPrice = null;\n    let variantLabel = str(m.serving_size);\n    const extraCols = variantPriceCols(m);\n    const basePrice = str(m.price) === '' ? null : toMoney(m.price);\n\n    if (extraCols.length === 0) {\n      // One row = one variant (e.g. separate half/full rows). Use the row price.\n      if (want.variant && variantLabel && norm(want.variant) !== norm(variantLabel)) {\n        return fail(422, 'variant_mismatch', 'The requested size \"' + want.variant + '\" does not match ' + itemName + ' (' + want.menu_item_id + '), which is \"' + variantLabel + '\". Send the menu_item_id of the size the customer selected.', { menu_item_id: want.menu_item_id });\n      }\n      unitPrice = basePrice;\n    } else {\n      // Several size prices on one row: resolve only from an explicit, matching variant.\n      if (!want.variant) {\n        return fail(422, 'variant_required', itemName + ' (' + want.menu_item_id + ') has multiple size prices (' + extraCols.join(', ') + '). The selected size must be supplied; it will not be guessed.', { menu_item_id: want.menu_item_id });\n      }\n      const token = norm(want.variant).replace(/[^a-z0-9]+/g, '');\n      const hits = extraCols.filter(function (k) {\n        return k.toLowerCase().split(/[^a-z0-9]+/).indexOf(token) !== -1;\n      });\n      if (hits.length !== 1) {\n        return fail(422, 'ambiguous_variant', 'The size \"' + want.variant + '\" could not be matched to exactly one price for ' + itemName + ' (' + want.menu_item_id + ').', { menu_item_id: want.menu_item_id });\n      }\n      unitPrice = toMoney(m[hits[0]]);\n      variantLabel = want.variant;\n    }\n    if (unitPrice === null || !(unitPrice > 0)) {\n      return fail(422, 'invalid_item_price', itemName + ' (' + want.menu_item_id + ') has no valid price in the menu, so it cannot be ordered.', { menu_item_id: want.menu_item_id });\n    }\n    unitPrice = round2(unitPrice);\n    lines.push({\n      menu_item_id: str(m.menu_item_id),\n      item_name: itemName,\n      variant: variantLabel,\n      quantity: want.quantity,\n      unit_price: unitPrice,\n      line_total: round2(unitPrice * want.quantity),\n    });\n  }\n\n  // ---- Delivery zone ----\n  const zoneMatches = zones.filter(function (z) { return norm(z.area_name) === norm(req.area_name); });\n  if (zoneMatches.length === 0) return fail(422, 'area_not_serviceable', 'We do not deliver to \"' + req.area_name + '\".', { area_name: req.area_name });\n  if (zoneMatches.length > 1) return fail(409, 'ambiguous_delivery_zone', 'More than one delivery zone matches \"' + req.area_name + '\". The Delivery_Zones sheet must be corrected first.', { area_name: req.area_name });\n  const zone = zoneMatches[0];\n  if (!isTrue(zone.is_serviceable)) return fail(422, 'area_not_serviceable', 'Delivery is currently not available in ' + str(zone.area_name) + '.', { area_name: str(zone.area_name) });\n  const fee = str(zone.delivery_fee) === '' ? null : toMoney(zone.delivery_fee);\n  if (fee === null || fee < 0) return fail(500, 'configuration_error', 'The delivery fee for ' + str(zone.area_name) + ' is missing or invalid. No order was saved.');\n\n  // ---- Totals ----\n  const itemsSubtotal = round2(lines.reduce(function (s, l) { return s + l.line_total; }, 0));\n  const deliveryFee = round2(fee);\n  const discount = round2(req.discount);\n  if (discount > itemsSubtotal) {\n    return fail(422, 'invalid_discount', 'The discount (' + discount + ') cannot exceed the items subtotal (' + itemsSubtotal + ').');\n  }\n  const minOrder = str(restaurant.minimum_order) === '' ? null : toMoney(restaurant.minimum_order);\n  if (minOrder !== null && itemsSubtotal < minOrder) {\n    return fail(422, 'below_minimum_order', 'The items subtotal (' + itemsSubtotal + ') is below the minimum order of ' + minOrder + ' for ' + str(restaurant.restaurant_name) + '.');\n  }\n  const totalAmount = round2(itemsSubtotal + deliveryFee - discount);\n\n  // ---- IDs ----\n  const now = new Date();\n  const ts = now.toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);\n  const rand = (Math.random().toString(36).slice(2) + '000000').slice(0, 6).toUpperCase();\n  const orderId = 'ORD' + ts + rand;\n\n  const items = lines.map(function (l, idx) {\n    return Object.assign({ order_item_id: orderId + '-' + String(idx + 1).padStart(2, '0'), order_id: orderId }, l);\n  });\n\n  return [{ json: {\n    ok: true,\n    order: {\n      order_id: orderId,\n      customer_id: str(customer.customer_id),\n      customer_name: str(customer.customer_name),\n      phone_number: str(customer.phone_number),\n      restaurant_id: str(restaurant.restaurant_id),\n      restaurant_name: str(restaurant.restaurant_name),\n      delivery_address: req.delivery_address,\n      area_name: str(zone.area_name),\n      items_subtotal: itemsSubtotal,\n      delivery_fee: deliveryFee,\n      discount: discount,\n      total_amount: totalAmount,\n      payment_method: req.payment_method,\n      order_status: 'Pending',\n      created_at: now.toISOString(),\n    },\n    items: items,\n  } }];\n} catch (err) {\n  return [{ json: { ok: false, statusCode: 500, body: {\n    success: false, error: 'internal_error', message: 'Something went wrong while verifying the order. No order was saved.',\n  } } }];\n}\n"
+      },
+      "id": "743a6b54-3d79-4d32-83f3-bc95b85030c3",
+      "name": "Verify Order & Calculate Totals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        -96
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ok-check",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dd52df99-a097-42f2-8aa5-5948f7887ca6",
+      "name": "Is Order Verified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "05723e3b-1207-479d-a25d-e6f88c48ad6d",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2032,
+        -352
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw",
+          "cachedResultName": "CraveAI — Master Database"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1164048823",
+          "cachedResultName": "Orders"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "order_id": "={{ $json.order.order_id }}",
+            "customer_id": "={{ $json.order.customer_id }}",
+            "customer_name": "={{ $json.order.customer_name }}",
+            "phone_number": "={{ $json.order.phone_number }}",
+            "restaurant_id": "={{ $json.order.restaurant_id }}",
+            "restaurant_name": "={{ $json.order.restaurant_name }}",
+            "delivery_address": "={{ $json.order.delivery_address }}",
+            "area_name": "={{ $json.order.area_name }}",
+            "items_subtotal": "={{ $json.order.items_subtotal }}",
+            "delivery_fee": "={{ $json.order.delivery_fee }}",
+            "discount": "={{ $json.order.discount }}",
+            "total_amount": "={{ $json.order.total_amount }}",
+            "payment_method": "={{ $json.order.payment_method }}",
+            "order_status": "={{ $json.order.order_status }}",
+            "created_at": "={{ $json.order.created_at }}"
+          },
+          "schema": [
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone_number",
+              "displayName": "phone_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "restaurant_id",
+              "displayName": "restaurant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "restaurant_name",
+              "displayName": "restaurant_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "delivery_address",
+              "displayName": "delivery_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "area_name",
+              "displayName": "area_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "items_subtotal",
+              "displayName": "items_subtotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "delivery_fee",
+              "displayName": "delivery_fee",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "discount",
+              "displayName": "discount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total_amount",
+              "displayName": "total_amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "payment_method",
+              "displayName": "payment_method",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "order_status",
+              "displayName": "order_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "0980bfd5-51e7-47d3-acc0-a1895274e85b",
+      "name": "Append Order",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1472,
+        -848
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fGEZxtENOuk2NtTk",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Runs only after the Orders row was appended successfully. Emits one item per order line.\nconst v = $('Verify Order & Calculate Totals').first().json;\nreturn v.items.map(function (it) {\n  return { json: {\n    order_item_id: it.order_item_id,\n    order_id: it.order_id,\n    menu_item_id: it.menu_item_id,\n    item_name: it.item_name,\n    quantity: it.quantity,\n    unit_price: it.unit_price,\n    line_total: it.line_total,\n  } };\n});\n"
+      },
+      "id": "55f69de4-a3e4-4747-9b2f-438691cd05ef",
+      "name": "Prepare Order Item Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        272
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw",
+          "cachedResultName": "CraveAI — Master Database"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1003834836",
+          "cachedResultName": "Order_Items"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "order_item_id": "={{ $json.order_item_id }}",
+            "order_id": "={{ $json.order_id }}",
+            "menu_item_id": "={{ $json.menu_item_id }}",
+            "item_name": "={{ $json.item_name }}",
+            "quantity": "={{ $json.quantity }}",
+            "unit_price": "={{ $json.unit_price }}",
+            "line_total": "={{ $json.line_total }}"
+          },
+          "schema": [
+            {
+              "id": "order_item_id",
+              "displayName": "order_item_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "menu_item_id",
+              "displayName": "menu_item_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "item_name",
+              "displayName": "item_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "quantity",
+              "displayName": "quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "unit_price",
+              "displayName": "unit_price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "line_total",
+              "displayName": "line_total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "1af844e1-df69-4655-9882-d95b0b53d185",
+      "name": "Append Order Items",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1760,
+        272
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fGEZxtENOuk2NtTk",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Confirms every Order_Items row was written. Reports an explicit partial failure otherwise.\ntry {\n  const v = $('Verify Order & Calculate Totals').first().json;\n  const order = v.order;\n  const expected = v.items;\n  const results = $input.all().map(function (i) { return i && i.json ? i.json : {}; });\n\n  const writtenIds = {};\n  results.forEach(function (r) {\n    if (r && !r.error && r.order_item_id !== undefined) writtenIds[String(r.order_item_id).trim()] = true;\n  });\n  const missing = expected.filter(function (it) { return !writtenIds[it.order_item_id]; });\n  const hadError = results.some(function (r) { return r && r.error; });\n\n  if (hadError || missing.length > 0) {\n    return [{ json: { statusCode: 500, body: {\n      success: false,\n      error: 'partial_order_write',\n      message: 'Order ' + order.order_id + ' was saved, but some of its items could not be confirmed as saved. The order is incomplete and must be reviewed manually. Do not resubmit it automatically, as that would create a duplicate order.',\n      order_id: order.order_id,\n      unconfirmed_order_item_ids: missing.map(function (it) { return it.order_item_id; }),\n    } } }];\n  }\n\n  return [{ json: { statusCode: 201, body: {\n    success: true,\n    message: 'Order ' + order.order_id + ' was created and is ' + order.order_status + '.',\n    order_id: order.order_id,\n    order: {\n      order_id: order.order_id,\n      order_status: order.order_status,\n      created_at: order.created_at,\n      customer_id: order.customer_id,\n      customer_name: order.customer_name,\n      restaurant_id: order.restaurant_id,\n      restaurant_name: order.restaurant_name,\n      delivery_address: order.delivery_address,\n      area_name: order.area_name,\n      payment_method: order.payment_method,\n      items: expected.map(function (it) {\n        return {\n          order_item_id: it.order_item_id,\n          menu_item_id: it.menu_item_id,\n          item_name: it.item_name,\n          variant: it.variant,\n          quantity: it.quantity,\n          unit_price: it.unit_price,\n          line_total: it.line_total,\n        };\n      }),\n      items_subtotal: order.items_subtotal,\n      delivery_fee: order.delivery_fee,\n      discount: order.discount,\n      total_amount: order.total_amount,\n      currency: 'PKR',\n    },\n  } } }];\n} catch (err) {\n  let orderId = null;\n  try { orderId = $('Verify Order & Calculate Totals').first().json.order.order_id; } catch (e) { orderId = null; }\n  return [{ json: { statusCode: 500, body: {\n    success: false,\n    error: 'order_status_unknown',\n    message: 'The order may have been partly saved but could not be confirmed. Review it manually and do not resubmit automatically.',\n    order_id: orderId,\n  } } }];\n}\n"
+      },
+      "id": "9b7f9162-2d22-43ab-8f62-f8a5537c6da1",
+      "name": "Confirm Saved Order",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1984,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Append Order failed: no item rows are written. The order row cannot be confirmed either way.\nlet orderId = null;\ntry { orderId = $('Verify Order & Calculate Totals').first().json.order.order_id; } catch (e) { orderId = null; }\nreturn [{ json: { statusCode: 503, body: {\n  success: false,\n  error: 'order_write_failed',\n  message: 'The order could not be saved to the database, so no order items were written. Check the Orders sheet for this order ID before trying again, so a duplicate order is not created.',\n  order_id: orderId,\n} } }];\n"
+      },
+      "id": "08f968e8-9e99-42cb-88d9-f2ba685d41ea",
+      "name": "Order Write Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        -848
+      ],
+      "executeOnce": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Order Processing Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Order Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Order Request": {
+      "main": [
+        [
+          {
+            "node": "Is Request Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Request Valid?": {
+      "main": [
+        [
+          {
+            "node": "Read Restaurants",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Restaurants": {
+      "main": [
+        [
+          {
+            "node": "Read Menu Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Menu Items": {
+      "main": [
+        [
+          {
+            "node": "Read Customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Customers": {
+      "main": [
+        [
+          {
+            "node": "Read Delivery Zones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Delivery Zones": {
+      "main": [
+        [
+          {
+            "node": "Verify Order & Calculate Totals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Order & Calculate Totals": {
+      "main": [
+        [
+          {
+            "node": "Is Order Verified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Order Verified?": {
+      "main": [
+        [
+          {
+            "node": "Append Order",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Order": {
+      "main": [
+        [
+          {
+            "node": "Prepare Order Item Rows",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Order Write Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Order Item Rows": {
+      "main": [
+        [
+          {
+            "node": "Append Order Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Order Items": {
+      "main": [
+        [
+          {
+            "node": "Confirm Saved Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm Saved Order": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order Write Failed": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "a9c825dd-ae7c-4965-814d-a1e4f6022373",
+  "meta": {
+    "instanceId": "86fc514573f11a71a1cbedea8cfb7fb3febee820a6a7bc3b2d2e67f9ce6a3ccf"
+  },
+  "nodeGroups": [
+    {
+      "id": "08290092-4c31-4075-976e-7905f73318bf",
+      "name": "Check order request",
+      "nodeIds": [
+        "0b354fce-53bc-4d87-9f94-76b80fec42d6",
+        "8adde739-0ca2-43b3-a6b0-5a99439200ae"
+      ],
+      "description": "Rejects missing fields, empty or invalid items, bad quantities and orders the customer has not explicitly confirmed"
+    },
+    {
+      "id": "a3e2dc67-032c-4842-aa77-ac2fa848fc6b",
+      "name": "Verify and price order",
+      "nodeIds": [
+        "baac1478-d394-4362-8907-fe9e97666947",
+        "21cbd127-c97f-42f3-b345-99095009d139",
+        "d53b3c5f-a6c1-4b1e-831a-74f159eb264a",
+        "0285e16f-13c0-4fde-875c-83da4cdfce47",
+        "743a6b54-3d79-4d32-83f3-bc95b85030c3",
+        "dd52df99-a097-42f2-8aa5-5948f7887ca6"
+      ],
+      "description": "Checks customer, restaurant, menu items and delivery area against the sheets, then totals using sheet prices and fees only"
+    },
+    {
+      "id": "981844a9-43ea-4208-a411-57b7e5f8e109",
+      "name": "Save order items",
+      "nodeIds": [
+        "55f69de4-a3e4-4747-9b2f-438691cd05ef",
+        "1af844e1-df69-4655-9882-d95b0b53d185",
+        "9b7f9162-2d22-43ab-8f62-f8a5537c6da1"
+      ],
+      "description": "Writes one line per ordered item under the new order and reports a partial failure if any line is not confirmed"
+    }
+  ],
+  "id": "lbYoBpvBkL7AmyDq",
+  "tags": []
+}

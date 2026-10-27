@@ -1,0 +1,275 @@
+{
+  "name": "CraveAI — Workflow A: Restaurant & Menu Search",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "craveai-menu-search",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "60309971-71d2-4e94-9a43-93bd0d1c1ee3",
+      "name": "Menu Search Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -64,
+        0
+      ],
+      "webhookId": "336b6be0-17ac-4bb4-b133-8c06c4ad0dde",
+      "notes": "POST JSON body: query (required), cuisine, area, restaurant_name, max_item_price (PKR per item), limit."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validates and normalizes the incoming search request. Deterministic, no external calls.\nconst DEFAULT_LIMIT = 10;\nconst MAX_LIMIT = 25;\nconst MAX_TEXT = 200;\n\nconst raw = $input.first().json || {};\nlet body = raw.body;\nif (typeof body === 'string') {\n  try { body = JSON.parse(body); } catch (e) { body = null; }\n}\n\nconst errors = [];\nif (!body || typeof body !== 'object' || Array.isArray(body)) {\n  errors.push('Request body must be a JSON object.');\n  body = {};\n}\n\nfunction optionalText(field) {\n  const v = body[field];\n  if (v === undefined || v === null) return null;\n  if (typeof v === 'number') return String(v);\n  if (typeof v !== 'string') { errors.push(field + ' must be a string.'); return null; }\n  const t = v.trim();\n  if (t.length === 0) return null;\n  if (t.length > MAX_TEXT) { errors.push(field + ' must be at most ' + MAX_TEXT + ' characters.'); return null; }\n  return t;\n}\n\nlet query = null;\nif (body.query === undefined || body.query === null) {\n  errors.push('query is required.');\n} else if (typeof body.query !== 'string') {\n  errors.push('query must be a string.');\n} else if (body.query.trim().length === 0) {\n  errors.push('query must not be empty.');\n} else if (body.query.trim().length > MAX_TEXT) {\n  errors.push('query must be at most ' + MAX_TEXT + ' characters.');\n} else {\n  query = body.query.trim();\n}\n\nconst cuisine = optionalText('cuisine');\nconst area = optionalText('area');\nconst restaurantName = optionalText('restaurant_name');\n\nlet maxItemPrice = null;\nconst mp = body.max_item_price;\nif (mp !== undefined && mp !== null && mp !== '') {\n  const n = typeof mp === 'number' ? mp : (typeof mp === 'string' ? Number(mp.replace(/,/g, '').trim()) : NaN);\n  if (!Number.isFinite(n) || n <= 0) errors.push('max_item_price must be a positive number (PKR).');\n  else maxItemPrice = n;\n}\n\nlet limit = DEFAULT_LIMIT;\nconst lv = body.limit;\nif (lv !== undefined && lv !== null && lv !== '') {\n  const n = typeof lv === 'number' ? lv : (typeof lv === 'string' ? Number(lv.trim()) : NaN);\n  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) errors.push('limit must be a positive integer.');\n  else limit = Math.min(n, MAX_LIMIT);\n}\n\nif (errors.length > 0) {\n  return [{ json: {\n    valid: false,\n    statusCode: 400,\n    body: {\n      success: false,\n      error: 'invalid_request',\n      message: 'Invalid search request: ' + errors.join(' '),\n      details: errors,\n    },\n  } }];\n}\n\nreturn [{ json: {\n  valid: true,\n  statusCode: 200,\n  request: {\n    query: query,\n    cuisine: cuisine,\n    area: area,\n    restaurant_name: restaurantName,\n    max_item_price: maxItemPrice,\n    limit: limit,\n  },\n} }];\n"
+      },
+      "id": "b0848a53-54eb-4a99-92cc-e12e19004008",
+      "name": "Validate Search Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        0
+      ],
+      "notes": "Checks query and optional filters. Default limit 10, max 25. Invalid input -> 400 response."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid-check",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f6596138-a2d9-499a-8935-1fe14da6a119",
+      "name": "Is Request Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        352,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw",
+          "mode": "list",
+          "cachedResultName": "CraveAI — Master Database",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Restaurants",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw/edit#gid=0"
+        },
+        "options": {}
+      },
+      "id": "624d7b91-daed-4919-b40e-e188488270d9",
+      "name": "Read Restaurants Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        656,
+        -64
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fGEZxtENOuk2NtTk",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Reads all rows from the Restaurants tab. Errors continue so the search step can return a safe 502."
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw",
+          "mode": "list",
+          "cachedResultName": "CraveAI — Master Database",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1708604933,
+          "mode": "list",
+          "cachedResultName": "Menu_Items",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw/edit#gid=1708604933"
+        },
+        "options": {}
+      },
+      "id": "8e59481e-caed-4b58-a2d9-9739bfc663b8",
+      "name": "Read Menu Items Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        -64
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fGEZxtENOuk2NtTk",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Runs once and reads all rows from the Menu_Items tab."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Deterministic join + filter + rank. Never invents data: every field comes from the sheet rows.\ntry {\n  const req = $('Validate Search Request').first().json.request;\n\n  const isRealRow = function (i) { return i && i.json && Object.keys(i.json).length > 0; };\n  const restaurantItems = $('Read Restaurants Sheet').all();\n  const menuItems = $('Read Menu Items Sheet').all();\n  const sheetFailed = restaurantItems.concat(menuItems).some(function (i) { return i && i.json && i.json.error; });\n  if (sheetFailed) {\n    return [{ json: { statusCode: 502, body: {\n      success: false, error: 'database_unavailable',\n      message: 'The restaurant database could not be read right now. Please try again shortly.'\n    } } }];\n  }\n\n  const toBool = function (v) {\n    if (v === true) return true;\n    if (v === false || v === null || v === undefined) return false;\n    if (typeof v === 'number') return v === 1;\n    const s = String(v).trim().toLowerCase();\n    return s === 'true' || s === 'yes' || s === 'y' || s === '1';\n  };\n  const str = function (v) { return v === null || v === undefined ? '' : String(v).trim(); };\n  const norm = function (v) { return str(v).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); };\n  const idKey = function (v) { return str(v).toUpperCase(); };\n  const parsePrice = function (v) {\n    if (v === null || v === undefined || v === '') return null;\n    if (typeof v === 'number') return Number.isFinite(v) && v >= 0 ? v : null;\n    const cleaned = String(v).replace(/[^0-9.]/g, '');\n    if (cleaned === '') return null;\n    const n = Number(cleaned);\n    return Number.isFinite(n) && n >= 0 ? n : null;\n  };\n  const STOP = ['a','an','the','i','me','my','we','want','would','like','some','any','please','from','in','at','of','for','with','and','or','to','near','order','get','food','dish','item','items','something','show','find'];\n  const stem = function (t) { return t.length > 3 && t.endsWith('s') ? t.slice(0, -1) : t; };\n  const tokens = function (v) { return norm(v).split(' ').filter(function (t) { return t && STOP.indexOf(t) === -1; }).map(stem); };\n  const tokenSet = function (v) { return norm(v).split(' ').filter(Boolean).map(stem); };\n  const allIn = function (qt, text) { if (!qt.length) return false; const ts = tokenSet(text); return qt.every(function (t) { return ts.indexOf(t) !== -1; }); };\n  const contains = function (hay, needle) { const h = norm(hay), n = norm(needle); return n.length > 0 && h.length > 0 && (' ' + h + ' ').indexOf(' ' + n + ' ') !== -1; };\n  const filterMatch = function (field, wanted) { const f = norm(field), w = norm(wanted); return f.length > 0 && (f.indexOf(w) !== -1 || w.indexOf(f) !== -1); };\n\n  // Active restaurants, keyed by restaurant_id (first occurrence wins to avoid duplicates).\n  const restaurants = {};\n  restaurantItems.filter(isRealRow).forEach(function (i) {\n    const r = i.json; const key = idKey(r.restaurant_id);\n    if (!key || restaurants[key] || !toBool(r.is_active)) return;\n    restaurants[key] = r;\n  });\n\n  const q = req.query; const qNorm = norm(q); const qTokens = tokens(q);\n  const seen = {};\n  const scored = [];\n\n  menuItems.filter(isRealRow).forEach(function (i) {\n    const m = i.json;\n    const rKey = idKey(m.restaurant_id);\n    const r = restaurants[rKey];\n    if (!r || !toBool(m.is_available) || !str(m.item_name)) return;\n    const dedupeKey = str(m.menu_item_id) ? 'id:' + idKey(m.menu_item_id) : 'nm:' + rKey + '|' + norm(m.item_name);\n    if (seen[dedupeKey]) return;\n\n    if (req.cuisine && !filterMatch(r.cuisine, req.cuisine)) return;\n    if (req.area && !filterMatch(r.area, req.area)) return;\n    if (req.restaurant_name && !filterMatch(r.restaurant_name, req.restaurant_name)) return;\n    const price = parsePrice(m.price);\n    if (req.max_item_price !== null && req.max_item_price !== undefined) {\n      if (price === null || price > req.max_item_price) return;\n    }\n\n    const itemName = norm(m.item_name);\n    let score = 0;\n    if (qNorm && itemName === qNorm) score = 100;\n    else if (contains(m.item_name, q)) score = 85;\n    else if (allIn(qTokens, m.item_name)) score = 75;\n    else if (itemName && contains(q, m.item_name)) score = 70;\n    else if (contains(r.restaurant_name, q) || allIn(qTokens, r.restaurant_name)) score = 55;\n    else if (contains(m.category, q) || allIn(qTokens, m.category) || (norm(m.category) && contains(q, m.category))) score = 45;\n    else if (contains(r.cuisine, q) || allIn(qTokens, r.cuisine) || (norm(r.cuisine) && contains(q, r.cuisine))) score = 40;\n    else if (contains(r.specialty, q) || allIn(qTokens, r.specialty)) score = 35;\n    else if (contains(m.description, q) || allIn(qTokens, m.description)) score = 30;\n    else if (contains(r.area, q) || allIn(qTokens, r.area)) score = 25;\n    else if (qTokens.length > 1) {\n      const combined = tokenSet([m.item_name, m.category, m.description, r.restaurant_name, r.cuisine, r.specialty, r.area].join(' '));\n      const hits = qTokens.filter(function (t) { return combined.indexOf(t) !== -1; }).length;\n      const ratio = hits / qTokens.length;\n      if (ratio >= 0.5) score = Math.round(10 + 10 * ratio);\n    }\n    if (score === 0) return;\n    const signature = toBool(m.is_signature_item);\n    if (signature) score += 3;\n\n    seen[dedupeKey] = true;\n    scored.push({ score: score, result: {\n      restaurant_id: str(r.restaurant_id),\n      restaurant_name: str(r.restaurant_name),\n      cuisine: str(r.cuisine),\n      restaurant_area: str(r.area),\n      menu_item_id: str(m.menu_item_id),\n      item_name: str(m.item_name),\n      category: str(m.category),\n      description: str(m.description),\n      price: price,\n      currency: 'PKR',\n      is_available: true,\n      is_vegetarian: toBool(m.is_vegetarian),\n      spice_level: str(m.spice_level),\n      is_signature_item: signature,\n      serving_size: str(m.serving_size)\n    } });\n  });\n\n  scored.sort(function (a, b) {\n    if (b.score !== a.score) return b.score - a.score;\n    if (a.result.is_signature_item !== b.result.is_signature_item) return a.result.is_signature_item ? -1 : 1;\n    const pa = a.result.price === null ? Infinity : a.result.price;\n    const pb = b.result.price === null ? Infinity : b.result.price;\n    if (pa !== pb) return pa - pb;\n    const rn = a.result.restaurant_name.localeCompare(b.result.restaurant_name);\n    if (rn !== 0) return rn;\n    return a.result.item_name.localeCompare(b.result.item_name);\n  });\n\n  const results = scored.slice(0, req.limit).map(function (s) { return s.result; });\n  const filtersApplied = {};\n  ['cuisine', 'area', 'restaurant_name', 'max_item_price'].forEach(function (k) { if (req[k] !== null && req[k] !== undefined) filtersApplied[k] = req[k]; });\n\n  return [{ json: { statusCode: 200, body: {\n    success: true,\n    query: q,\n    filters: filtersApplied,\n    count: results.length,\n    total_matches: scored.length,\n    results: results,\n    message: results.length > 0\n      ? 'Matching menu items found. Opening hours are not checked; availability reflects the database only.'\n      : 'No matching menu items found. Try a different dish, cuisine or restaurant name, or remove some filters.'\n  } } }];\n} catch (err) {\n  return [{ json: { statusCode: 500, body: {\n    success: false, error: 'internal_error',\n    message: 'Something went wrong while searching the menu. Please try again.'\n  } } }];\n}\n"
+      },
+      "id": "1f37dcd6-3b03-43d5-86c6-53adc2085270",
+      "name": "Join, Filter & Rank Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        -32
+      ],
+      "notes": "Joins menu items to active restaurants by restaurant_id, applies filters, ranks (item-name match first, signature as tie-breaker), dedupes and formats JSON."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "a3bbb523-ca45-453c-901f-7501725b29f5",
+      "name": "Respond to Caller",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1024,
+        256
+      ],
+      "notes": "Returns body with statusCode (200 results, 400 invalid request, 502 database error, 500 internal error)."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Menu Search Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Search Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Search Request": {
+      "main": [
+        [
+          {
+            "node": "Is Request Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Request Valid?": {
+      "main": [
+        [
+          {
+            "node": "Read Restaurants Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Caller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Restaurants Sheet": {
+      "main": [
+        [
+          {
+            "node": "Read Menu Items Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Menu Items Sheet": {
+      "main": [
+        [
+          {
+            "node": "Join, Filter & Rank Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Join, Filter & Rank Results": {
+      "main": [
+        [
+          {
+            "node": "Respond to Caller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "0f697bd0-7f0b-4a88-a728-4fda263eab4a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "86fc514573f11a71a1cbedea8cfb7fb3febee820a6a7bc3b2d2e67f9ce6a3ccf"
+  },
+  "nodeGroups": [],
+  "id": "ZohXFJf0TIaaoC41",
+  "tags": []
+}

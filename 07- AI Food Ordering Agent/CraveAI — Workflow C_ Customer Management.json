@@ -1,0 +1,595 @@
+{
+  "name": "CraveAI — Workflow C: Customer Management",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "craveai-customer-management",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "91aa3488-865d-48f0-8f9d-546374173dd8",
+      "name": "Customer Management Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -304,
+        -32
+      ],
+      "webhookId": "df46e3e7-6b4d-4fd6-886a-3e7f5e1af341"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validates and normalizes the incoming customer request. No external calls.\nconst LIMITS = { customer_name: 100, phone_number: 25, delivery_address: 300, area_name: 100, notes: 500 };\n\n// Shared phone normalization: strip spaces, hyphens, dots and parentheses only.\n// Leading zeros and a leading + country code are preserved as-is.\nconst normalizePhone = function (v) { return String(v).trim().replace(/[\\s\\-().]/g, ''); };\n\nconst raw = $input.first().json || {};\nlet body = raw.body;\nif (typeof body === 'string') {\n  try { body = JSON.parse(body); } catch (e) { body = null; }\n}\n\nconst errors = [];\nif (!body || typeof body !== 'object' || Array.isArray(body)) {\n  errors.push('Request body must be a JSON object.');\n  body = {};\n}\n\nconst requiredText = function (field) {\n  const v = body[field];\n  if (v === undefined || v === null) { errors.push(field + ' is required.'); return null; }\n  if (typeof v !== 'string') { errors.push(field + ' must be a string.'); return null; }\n  const t = v.trim().replace(/\\s+/g, ' ');\n  if (t.length === 0) { errors.push(field + ' must not be empty.'); return null; }\n  if (t.length > LIMITS[field]) { errors.push(field + ' must be at most ' + LIMITS[field] + ' characters.'); return null; }\n  return t;\n};\n\nconst customer_name = requiredText('customer_name');\nconst delivery_address = requiredText('delivery_address');\nconst area_name = requiredText('area_name');\n\nlet phone_number = null;\nconst rawPhone = requiredText('phone_number');\nif (rawPhone !== null) {\n  const p = normalizePhone(rawPhone);\n  if (!/^\\+?[0-9]{7,15}$/.test(p)) {\n    errors.push('phone_number must contain 7 to 15 digits (an optional leading + is allowed; spaces, hyphens and parentheses are ignored).');\n  } else {\n    phone_number = p;\n  }\n}\n\nlet notes = '';\nif (body.notes !== undefined && body.notes !== null) {\n  if (typeof body.notes !== 'string') {\n    errors.push('notes must be a string when provided.');\n  } else if (body.notes.trim().length > LIMITS.notes) {\n    errors.push('notes must be at most ' + LIMITS.notes + ' characters.');\n  } else {\n    notes = body.notes.trim();\n  }\n}\n\nif (errors.length > 0) {\n  return [{ json: {\n    valid: false,\n    statusCode: 400,\n    body: {\n      success: false,\n      error: 'invalid_request',\n      message: 'Invalid customer request: ' + errors.join(' '),\n      details: errors,\n    },\n  } }];\n}\n\nreturn [{ json: {\n  valid: true,\n  customer: { customer_name: customer_name, phone_number: phone_number, delivery_address: delivery_address, area_name: area_name, notes: notes },\n} }];\n"
+      },
+      "id": "3687f303-5719-476a-952c-1a7ee95e3d81",
+      "name": "Validate Customer Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid-check",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9cfe95d7-aaf5-4d0a-a838-230c1835d502",
+      "name": "Is Request Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        272,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw",
+          "cachedResultName": "CraveAI — Master Database"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "525924755",
+          "cachedResultName": "Customers"
+        },
+        "options": {}
+      },
+      "id": "153570f1-a7ec-4bd2-a2d5-be0a16f5e0f3",
+      "name": "Read Customers Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        128,
+        416
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fGEZxtENOuk2NtTk",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "16a942e5-81d4-4f92-94ce-6f9464d30f4b",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1248,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Identifies the customer by normalized phone number. Does not write anything.\ntry {\n  const incoming = $('Validate Customer Request').first().json.customer;\n  const items = $input.all();\n\n  const fail = function (statusCode, error, message, extra) {\n    const body = Object.assign({ success: false, error: error, message: message }, extra || {});\n    return [{ json: { route: 'error', statusCode: statusCode, body: body } }];\n  };\n\n  // Google Sheets read failure: never fall through to creating a customer blindly.\n  if (items.some(function (i) { return i && i.json && i.json.error; })) {\n    return fail(503, 'database_unavailable', 'The customer database could not be read right now. Please try again shortly.');\n  }\n\n  // Empty sheet yields a single empty item; drop it.\n  const rows = items\n    .map(function (i) { return i && i.json ? i.json : {}; })\n    .filter(function (r) { return Object.keys(r).length > 0; });\n\n  if (rows.length > 0) {\n    const present = {};\n    rows.forEach(function (r) { Object.keys(r).forEach(function (k) { present[k] = true; }); });\n    const missing = ['customer_id', 'phone_number'].filter(function (c) { return !present[c]; });\n    if (missing.length > 0) {\n      return fail(500, 'configuration_error', 'The Customers sheet is missing required columns: ' + missing.join(', ') + '.');\n    }\n  }\n\n  const str = function (v) { return v === null || v === undefined ? '' : String(v).trim(); };\n  // Same normalization as the validation step.\n  const normalizePhone = function (v) { return str(v).replace(/[\\s\\-().]/g, ''); };\n  const sameText = function (a, b) {\n    return str(a).replace(/\\s+/g, ' ').toLowerCase() === str(b).replace(/\\s+/g, ' ').toLowerCase();\n  };\n\n  const matches = rows.filter(function (r) { return normalizePhone(r.phone_number) === incoming.phone_number; });\n\n  if (matches.length > 1) {\n    return fail(409, 'duplicate_customer_records', 'Multiple customer records share this phone number. The Customers sheet must be corrected before this customer can be used.', {\n      phone_number: incoming.phone_number,\n      matching_customer_ids: matches.map(function (r) { return str(r.customer_id); }),\n    });\n  }\n\n  const existingIds = {};\n  rows.forEach(function (r) { const id = str(r.customer_id); if (id) existingIds[id] = (existingIds[id] || 0) + 1; });\n\n  if (matches.length === 0) {\n    // Prepare a new customer. ID format: C + UTC timestamp + 4 random chars, checked against existing IDs.\n    let newId = '';\n    for (let attempt = 0; attempt < 10; attempt++) {\n      const ts = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);\n      const rand = Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(4, '0');\n      const candidate = 'C' + ts + rand;\n      if (!existingIds[candidate]) { newId = candidate; break; }\n    }\n    if (!newId) {\n      return fail(500, 'id_generation_failed', 'A unique customer ID could not be generated. Please try again.');\n    }\n    return [{ json: {\n      route: 'create',\n      record: {\n        customer_id: newId,\n        customer_name: incoming.customer_name,\n        phone_number: incoming.phone_number,\n        delivery_address: incoming.delivery_address,\n        area_name: incoming.area_name,\n        created_at: new Date().toISOString(),\n        notes: incoming.notes,\n      },\n    } }];\n  }\n\n  const existing = matches[0];\n  const customerId = str(existing.customer_id);\n  if (!customerId) {\n    return fail(500, 'data_integrity_error', 'The matching customer record has no customer_id, so it cannot be safely reused or updated.');\n  }\n  if (existingIds[customerId] > 1) {\n    return fail(409, 'duplicate_customer_id', 'The customer_id ' + customerId + ' appears on more than one row. The Customers sheet must be corrected first.');\n  }\n\n  const addressChanged = !sameText(existing.delivery_address, incoming.delivery_address);\n  const areaChanged = !sameText(existing.area_name, incoming.area_name);\n  const changed = addressChanged || areaChanged;\n\n  // Name, phone, notes, customer_id and created_at always keep their stored values.\n  return [{ json: {\n    route: changed ? 'update' : 'reuse',\n    changed_fields: [].concat(addressChanged ? ['delivery_address'] : [], areaChanged ? ['area_name'] : []),\n    record: {\n      customer_id: customerId,\n      customer_name: str(existing.customer_name),\n      phone_number: str(existing.phone_number),\n      delivery_address: addressChanged ? incoming.delivery_address : str(existing.delivery_address),\n      area_name: areaChanged ? incoming.area_name : str(existing.area_name),\n      created_at: str(existing.created_at),\n      notes: str(existing.notes),\n    },\n  } }];\n} catch (err) {\n  return [{ json: { route: 'error', statusCode: 500, body: {\n    success: false, error: 'internal_error', message: 'Something went wrong while looking up the customer. Please try again.',\n  } } }];\n}\n"
+      },
+      "id": "3565d887-cf48-4f92-bf44-c5ba6d4f779f",
+      "name": "Find Customer by Phone",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "create",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "create"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "update",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "update"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "reuse",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reuse"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "error"
+        }
+      },
+      "id": "13634770-6eff-4507-ba78-13bb866903f2",
+      "name": "Route Customer Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw",
+          "cachedResultName": "CraveAI — Master Database"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "525924755",
+          "cachedResultName": "Customers"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ $json.record.customer_id }}",
+            "customer_name": "={{ $json.record.customer_name }}",
+            "phone_number": "={{ $json.record.phone_number }}",
+            "delivery_address": "={{ $json.record.delivery_address }}",
+            "area_name": "={{ $json.record.area_name }}",
+            "created_at": "={{ $json.record.created_at }}",
+            "notes": "={{ $json.record.notes }}"
+          },
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone_number",
+              "displayName": "phone_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "delivery_address",
+              "displayName": "delivery_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "area_name",
+              "displayName": "area_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "bc3238b1-1e40-45b1-93f8-ff9869535980",
+      "name": "Create New Customer",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        928,
+        -144
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fGEZxtENOuk2NtTk",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds one consistent response for created / updated / reused customers.\ntry {\n  const found = $('Find Customer by Phone').first().json;\n  const r = found.record || {};\n  const route = found.route;\n  const result = $input.first() ? $input.first().json : {};\n\n  const dbWriteFailed = function (verb) {\n    return [{ json: { statusCode: 503, body: {\n      success: false,\n      error: 'database_write_failed',\n      message: 'The customer record could not be ' + verb + ' in the database. No changes were confirmed. Please try again.',\n    } } }];\n  };\n\n  if (route === 'create' || route === 'update') {\n    // Only report success when the sheet write returned the row we wrote.\n    const writeOk = result && !result.error && String(result.customer_id || '').trim() === r.customer_id;\n    if (!writeOk) return dbWriteFailed(route === 'create' ? 'created' : 'updated');\n  } else if (route !== 'reuse') {\n    return [{ json: { statusCode: 500, body: { success: false, error: 'internal_error', message: 'Unexpected customer action.' } } }];\n  }\n\n  const action = route === 'create' ? 'created' : route === 'update' ? 'updated' : 'reused';\n  const messages = {\n    created: 'New customer created.',\n    updated: 'Existing customer found; delivery details updated (' + (found.changed_fields || []).join(', ') + ').',\n    reused: 'Existing customer found; no changes needed.',\n  };\n\n  return [{ json: { statusCode: 200, body: {\n    success: true,\n    action: action,\n    customer_id: r.customer_id,\n    customer_name: r.customer_name,\n    phone_number: r.phone_number,\n    delivery_address: r.delivery_address,\n    area_name: r.area_name,\n    created_at: r.created_at,\n    message: messages[action],\n  } } }];\n} catch (err) {\n  return [{ json: { statusCode: 500, body: {\n    success: false, error: 'internal_error', message: 'Something went wrong while finalizing the customer record.',\n  } } }];\n}\n"
+      },
+      "id": "df928d7d-83c6-43c2-a6ff-21b4429bb277",
+      "name": "Normalize Customer Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1NMQlIr7u9VCCw04n6MawJsYoy7t6hleD4ElVVkQ3Fzw",
+          "cachedResultName": "CraveAI — Master Database"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "525924755",
+          "cachedResultName": "Customers"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "customer_id"
+          ],
+          "value": {
+            "customer_id": "={{ $json.record.customer_id }}",
+            "delivery_address": "={{ $json.record.delivery_address }}",
+            "area_name": "={{ $json.record.area_name }}"
+          },
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "delivery_address",
+              "displayName": "delivery_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "area_name",
+              "displayName": "area_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "9b2a9ead-c981-4211-b04b-27231210c5f2",
+      "name": "Update Existing Customer",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1488,
+        224
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fGEZxtENOuk2NtTk",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Customer Management Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Customer Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Customer Request": {
+      "main": [
+        [
+          {
+            "node": "Is Request Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Request Valid?": {
+      "main": [
+        [
+          {
+            "node": "Read Customers Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Customers Sheet": {
+      "main": [
+        [
+          {
+            "node": "Find Customer by Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Customer by Phone": {
+      "main": [
+        [
+          {
+            "node": "Route Customer Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Customer Action": {
+      "main": [
+        [
+          {
+            "node": "Create New Customer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Existing Customer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize Customer Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create New Customer": {
+      "main": [
+        [
+          {
+            "node": "Normalize Customer Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Customer Result": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Existing Customer": {
+      "main": [
+        [
+          {
+            "node": "Normalize Customer Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "b5f895bb-17f9-4e50-a11f-52720471024a",
+  "meta": {
+    "instanceId": "86fc514573f11a71a1cbedea8cfb7fb3febee820a6a7bc3b2d2e67f9ce6a3ccf"
+  },
+  "nodeGroups": [
+    {
+      "id": "3d33cbde-59e1-485a-991f-e5031d34dd28",
+      "name": "Validate request",
+      "nodeIds": [
+        "3687f303-5719-476a-952c-1a7ee95e3d81",
+        "9cfe95d7-aaf5-4d0a-a838-230c1835d502"
+      ],
+      "description": "Checks required customer fields, trims input and normalizes the phone; invalid requests get a 400 reply"
+    },
+    {
+      "id": "5edd7fc6-acd2-45e3-8c4e-9c4060e409c9",
+      "name": "Identify customer",
+      "nodeIds": [
+        "153570f1-a7ec-4bd2-a2d5-be0a16f5e0f3",
+        "3565d887-cf48-4f92-bf44-c5ba6d4f779f",
+        "13634770-6eff-4507-ba78-13bb866903f2"
+      ],
+      "description": "Looks up the phone in the Customers sheet and decides: create, update address, reuse, or return an error"
+    }
+  ],
+  "id": "GBy4fHY5my410Gnt",
+  "tags": []
+}
