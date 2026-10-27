@@ -11,9 +11,14 @@ CraveAI is a portfolio prototype exploring how conversational AI and workflow au
 > **Purpose:** Demonstrate AI agent integrations and workflow automation
 
 
+---
+
+## 🎥 Live Demo
+
 
 **Watch the Full Project Demonstration:**
 [▶️ Live Demo Video](https://elevenlabs.io/app/talk-to?agent_id=agent_4801m5wxk4e5fkcaan3pqf5319kh&branch_id=agtbrch_2001m5wxk5pnfd1rkrm2e7beq0tk)
+
 ---
 
 ## 📌 Table of Contents
