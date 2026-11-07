@@ -1,0 +1,470 @@
+{
+  "name": "Social Media Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1rQRem3y4iYXYD6CMyIIfizU5rdyvgE01JooDN1rrlzI/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1rQRem3y4iYXYD6CMyIIfizU5rdyvgE01JooDN1rrlzI/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "id": "0fb5096c-638c-404c-be6d-405df1b97de1",
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        -464
+      ],
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "K1k0rVbvppo6QGzu",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "be583a96-b011-45fa-8e7e-7e7d6945db67",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7ac1913d-4bbf-4a6c-8fe2-c448e3610f81",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        -192,
+        -464
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.1-flash-lite",
+          "mode": "list",
+          "cachedResultName": "Gemini 3.1 Flash Lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Write ONE LinkedIn post (not multiple options, no headings, no tips or commentary) for the topic: {{ $json.Topic }}. Keep it under 1500 characters. Output only the post text."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "157cec6e-3876-4e3e-ae80-cae3d151fefd",
+      "name": "Message a model",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        16,
+        -480
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "1CDWq7wLKu98POoZ",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-nano-banana-2.1",
+          "mode": "list",
+          "cachedResultName": "gemini-nano-banana-2.1 (Nano Banana 2.1)"
+        },
+        "prompt": "=Generate an Image that perfectly represents this linkedin Post  {{ $json.content.parts[0].text }}",
+        "options": {}
+      },
+      "id": "1bf4dca7-eeea-490c-8170-3f6312c00940",
+      "name": "Generate an image",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        304,
+        -480
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Google Sheets Trigger').item.json['Publish Date'] }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "id": "5b3b12dc-afcc-4654-9516-65c2d145e2d2",
+      "name": "Upload file",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        352,
+        -208
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "SRy9twOP6Q7rjJxn",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "sendAndWait",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0CFH6H9NAV",
+          "mode": "list",
+          "cachedResultName": "all-huzaitech"
+        },
+        "message": "=Here's the Linkedin Post for  {{ $('Google Sheets Trigger').item.json['Publish Date'] }}::{{ $('Message a model').item.json.content.parts[0].text.slice(0, 2500) }}\n\nAlso The Image: {{ $json.webContentLink }}",
+        "options": {}
+      },
+      "id": "72478cd3-2b14-4628-bf25-afe1e0894c17",
+      "name": "Send message and wait for response",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        576,
+        -512
+      ],
+      "webhookId": "24cf9455-c0ff-44ca-88ff-50fb8e076035",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "xC1ZdRCOHd4mavSa",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "a680b7a6-290f-42b8-9a83-7214ba220253",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e393d77b-d863-447c-b937-3c5f396d9ad7",
+      "name": "If1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        848,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0CFH6H9NAV",
+          "mode": "list",
+          "cachedResultName": "all-huzaitech"
+        },
+        "text": "This Post has Been Published",
+        "otherOptions": {}
+      },
+      "id": "4bb29d5c-bbfa-4de1-9e53-7466e5bc76fb",
+      "name": "Send a message",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        704,
+        -144
+      ],
+      "webhookId": "a35a25a3-4c0c-4229-9f13-192150be9c1e",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "xC1ZdRCOHd4mavSa",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1rQRem3y4iYXYD6CMyIIfizU5rdyvgE01JooDN1rrlzI/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1rQRem3y4iYXYD6CMyIIfizU5rdyvgE01JooDN1rrlzI/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Publish Date": "={{ $('Google Sheets Trigger').item.json['Publish Date'] }}",
+            "Status": "Published"
+          },
+          "matchingColumns": [
+            "Publish Date"
+          ],
+          "schema": [
+            {
+              "id": "Publish Date",
+              "displayName": "Publish Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Topic",
+              "displayName": "Topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d3581759-d98d-4398-885e-b0340a04fce0",
+      "name": "Update row in sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1088,
+        -640
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "XNnLspqg69bfn6Z3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "person": "f6zXYt4086",
+        "text": "={{ $('Message a model').item.json.content.parts[0].text }}",
+        "additionalFields": {
+          "visibility": "PUBLIC"
+        }
+      },
+      "id": "4e11beb0-7da0-441e-922b-1d078cf65632",
+      "name": "Create a post",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        -288
+      ],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "KQBSKhksxtNyJAmX",
+          "name": "LinkedIn account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Generate an image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate an image": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message and wait for response": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create a post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ed32982a-c10c-4e62-ac20-350395f337eb",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "101748c86873779dc1f8b5927ae970d383b61ff6923f47e6e6c5e07130b92ca1"
+  },
+  "nodeGroups": [],
+  "id": "JFFMCXpjrpRasCev",
+  "tags": []
+}
